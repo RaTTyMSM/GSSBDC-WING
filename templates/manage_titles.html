@@ -1,0 +1,34 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Manage Titles</title>
+</head>
+<body>
+    <h2>Manage Executive Titles</h2>
+    <a href="{{ url_for('home') }}">&larr; Back to Dashboard</a>
+    | <a href="{{ url_for('logout') }}">Logout</a>
+    <hr>
+
+    {% if message %}
+        <p style="color: green;">{{ message }}</p>
+    {% endif %}
+    {% if error %}
+        <p style="color: red;">{{ error }}</p>
+    {% endif %}
+
+    <h3>Current Titles (in rank order)</h3>
+    <ol>
+        {% for t in titles %}
+        <li>{{ t }}</li>
+        {% endfor %}
+    </ol>
+
+    <h3>Add New Title</h3>
+    <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="text" name="new_title" placeholder="e.g. Assistant Secretary" required>
+        <button type="submit">Add Title</button>
+    </form>
+    <p><small>Notun title list-er sheshe jog hobe (lowest rank). Order change korte hole amay bolo.</small></p>
+</body>
+</html>

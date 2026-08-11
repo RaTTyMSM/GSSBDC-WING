@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Add Member</title>
+</head>
+<body>
+    <h2>Add Member</h2>
+    <a href="{{ url_for('home') }}">&larr; Back to Dashboard</a>
+    | <a href="{{ url_for('logout') }}">Logout</a>
+    <hr>
+
+    {% if error %}
+        <p style="color: red;">{{ error }}</p>
+    {% endif %}
+
+    <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label>Name:</label><br>
+        <input type="text" name="name" required><br><br>
+
+        <label>Role:</label><br>
+        <select name="role" id="role" onchange="toggleFields()">
+            {% for r in addable_roles %}
+            <option value="{{ r }}">{{ r }}</option>
+            {% endfor %}
+        </select><br><br>
+
+        <div id="title-field">
+            <label>Designation:</label><br>
+            <select name="title">
+                <option value="">-- None --</option>
+                {% for t in executive_titles %}
+                <option value="{{ t }}">{{ t }}</option>
+                {% endfor %}
+            </select><br><br>
+
+            <label>Portfolio / Department (optional):</label><br>
+            <input type="text" name="portfolio" placeholder="e.g. Management">
+        </div><br>
+
+        <div id="member-id-field">
+            <label>ID:</label><br>
+            <input type="text" name="member_code" placeholder="e.g. 2021331045"><br><br>
+
+            <label>Department:</label><br>
+            <select name="department">
+                <option value="">-- Select --</option>
+                {% for d in departments %}
+                <option value="{{ d }}">{{ d }}</option>
+                {% endfor %}
+            </select>
+        </div><br>
+
+        <div id="contact-fields">
+            <label>Phone:</label><br>
+            <input type="text" name="phone"><br><br>
+
+            <label>Email:</label><br>
+            <input type="email" name="email"><br><br>
+        </div>
+
+        <label>Username:</label><br>
+        <input type="text" name="username" required><br><br>
+
+        <label>Password:</label><br>
+        <input type="password" name="password" required minlength="4"><br><br>
+
+        <button type="submit">Add Member</button>
+    </form>
+
+    <script>
+        function toggleFields() {
+            var role = document.getElementById("role").value;
+            document.getElementById("title-field").style.display = (role === "Executive") ? "block" : "none";
+            document.getElementById("member-id-field").style.display = (role === "Admin" || role === "Watcher") ? "none" : "block";
+            document.getElementById("contact-fields").style.display = (role === "Admin") ? "none" : "block";
+        }
+        toggleFields();
+    </script>
+</body>
+</html>

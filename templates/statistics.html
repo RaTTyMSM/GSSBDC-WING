@@ -1,0 +1,85 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Statistics</title>
+</head>
+<body>
+    <h2>Statistics</h2>
+    <a href="{{ url_for('home') }}">&larr; Back to Dashboard</a>
+    | <a href="{{ url_for('logout') }}">Logout</a>
+    <hr>
+
+    <p>
+        <strong>Monthly</strong>
+        &nbsp;|&nbsp; <a href="{{ url_for('statistics_committee_page') }}">Committee-based Statistics</a>
+        &nbsp;|&nbsp; <a href="{{ url_for('statistics_yearly_page') }}">Yearly Statistics</a>
+    </p>
+    <hr>
+
+    <h3>Overall Club Statistics (All-Time)</h3>
+    <p style="color:#555;">Only bags managed by our own club members are counted here. Donations logged as "External" or arranged by a patient's family are excluded.</p>
+    <p>Total Donors: {{ total_donors }}</p>
+    <p>Total Club Donations Recorded: {{ total_donations }}</p>
+    <p>Total Blood Collected (Club): {{ overall_bags }} Bags</p>
+
+    <h4>All-Time Request Outcomes</h4>
+    <p>
+        Fulfilled: {{ overall_breakdown.fulfilled }}
+        &nbsp;|&nbsp; Partial: {{ overall_breakdown.partial }}
+        &nbsp;|&nbsp; Incomplete: {{ overall_breakdown.incomplete }}
+        &nbsp;|&nbsp; Still Open: {{ overall_breakdown.open }}
+    </p>
+
+    <hr>
+
+    <h3>Monthly Statistics</h3>
+    <form method="GET">
+        <label>Select Month:</label>
+        <input type="month" name="month" value="{{ month }}">
+        <button type="submit">View</button>
+    </form>
+    <br>
+
+    <h4>{{ monthly.month }}</h4>
+    <p>Total Club Donations: {{ monthly.total_donations }}</p>
+    <p>Total Blood Collected (Club): {{ monthly.total_bags }} Bags</p>
+    <p>Fulfilled Requests: {{ monthly.fulfilled_requests }}</p>
+    <p>Partial Requests: {{ monthly.partial_requests }}</p>
+    <p>Incomplete Requests: {{ monthly.incomplete_requests }}</p>
+    <p>Donors Contacted: {{ monthly.total_contacts }}</p>
+    <p>Donors Agreed: {{ monthly.total_agreed }}</p>
+    <p>Donors Donated: {{ monthly.total_donated }}</p>
+    <p>Failed Contacts: {{ monthly.total_failed }}</p>
+
+    <h4>Member Performance &mdash; {{ monthly.month }}</h4>
+    <table border="1" cellpadding="8" cellspacing="0">
+        <tr>
+            <th>Serial</th>
+            <th>Name</th>
+            <th>Designation</th>
+            <th>Contacted</th>
+            <th>Agreed</th>
+            <th>Donated</th>
+            <th>Failed</th>
+            <th>Requests Managed</th>
+            <th>Blood Managed</th>
+        </tr>
+        {% for row in member_rows %}
+        <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ row.name }}</td>
+            <td>{{ row.designation }}</td>
+            <td>{{ row.contacted }}</td>
+            <td>{{ row.agreed }}</td>
+            <td>{{ row.donated }}</td>
+            <td>{{ row.failed }}</td>
+            <td>{{ row.requests_managed }}</td>
+            <td>{{ row.blood_managed }} Bags</td>
+        </tr>
+        {% endfor %}
+        {% if not member_rows %}
+        <tr><td colspan="9">No members found.</td></tr>
+        {% endif %}
+    </table>
+</body>
+</html>

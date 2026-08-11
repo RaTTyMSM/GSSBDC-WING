@@ -1,0 +1,133 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Blood Requests</title>
+</head>
+<body>
+    <h2>Blood Requests</h2>
+    <a href="{{ url_for('home') }}">&larr; Back to Dashboard</a>
+    {% if has_permission(session_member, 'create_request') %}
+        | <a href="{{ url_for('create_request_page') }}">+ Create Request</a>
+    {% endif %}
+    | <a href="{{ url_for('logout') }}">Logout</a>
+    <hr>
+
+    <h3>Open Requests</h3>
+    <p style="color:#555;">Still within the 3-day window and not yet fully managed.</p>
+    <table border="1" cellpadding="8" cellspacing="0">
+        <tr>
+            <th>ID</th>
+            <th>Blood Group</th>
+            <th>Area</th>
+            <th>Bags</th>
+            <th>Urgency</th>
+            <th>Managed So Far</th>
+            <th>Actions</th>
+        </tr>
+        {% for r in open_requests %}
+        <tr>
+            <td>{{ r.id }}</td>
+            <td>{{ r.blood_group }}</td>
+            <td>{{ r.area }}</td>
+            <td>{{ r.bags }}</td>
+            <td>{{ r.urgency }}</td>
+            <td>{{ r.collected_bags }} / {{ r.bags }}</td>
+            <td>
+                {% if has_permission(session_member, 'complete_request') %}
+                    <a href="{{ url_for('match_donors_page', request_id=r.id) }}">Find Matching Donors</a>
+                    |
+                    <a href="{{ url_for('complete_request_page', request_id=r.id) }}">Manage / Complete</a>
+                {% endif %}
+            </td>
+        </tr>
+        {% endfor %}
+        {% if not open_requests %}
+        <tr><td colspan="7">No open blood request found.</td></tr>
+        {% endif %}
+    </table>
+
+    <br><br>
+
+    <h3>Partially Managed Requests</h3>
+    <p style="color:#b8860b;">3-day window has passed and it's still short of bags. This is now locked and cannot be edited further.</p>
+    <table border="1" cellpadding="8" cellspacing="0">
+        <tr>
+            <th>ID</th>
+            <th>Blood Group</th>
+            <th>Area</th>
+            <th>Bags Collected</th>
+        </tr>
+        {% for r in partial_requests %}
+        <tr>
+            <td>{{ r.id }}</td>
+            <td>{{ r.blood_group }}</td>
+            <td>{{ r.area }}</td>
+            <td>{{ r.collected_bags }} / {{ r.bags }}</td>
+        </tr>
+        {% endfor %}
+        {% if not partial_requests %}
+        <tr><td colspan="4">None.</td></tr>
+        {% endif %}
+    </table>
+
+    <br><br>
+
+    <h3>Incomplete Requests</h3>
+    <p style="color:#b22222;">3-day window has passed and nothing was managed for it yet. This is now locked and cannot be edited further.</p>
+    <table border="1" cellpadding="8" cellspacing="0">
+        <tr>
+            <th>ID</th>
+            <th>Blood Group</th>
+            <th>Area</th>
+            <th>Bags Needed</th>
+        </tr>
+        {% for r in incomplete_requests %}
+        <tr>
+            <td>{{ r.id }}</td>
+            <td>{{ r.blood_group }}</td>
+            <td>{{ r.area }}</td>
+            <td>{{ r.bags }}</td>
+        </tr>
+        {% endfor %}
+        {% if not incomplete_requests %}
+        <tr><td colspan="4">None.</td></tr>
+        {% endif %}
+    </table>
+
+    <br><br>
+
+    <h3>Fulfilled Requests</h3>
+    <table border="1" cellpadding="8" cellspacing="0">
+        <tr>
+            <th>ID</th>
+            <th>Blood Group</th>
+            <th>Area</th>
+            <th>Bags Collected</th>
+            <th>Donors</th>
+            <th>Managed By</th>
+            <th>Completed Date</th>
+        </tr>
+        {% for r in fulfilled_requests %}
+        <tr>
+            <td>{{ r.id }}</td>
+            <td>{{ r.blood_group }}</td>
+            <td>{{ r.area }}</td>
+            <td>{{ r.collected_bags }} / {{ r.bags }}</td>
+            <td>
+                {% for f in r.fulfillments %}
+                    {{ f.donor_name }}{% if f.source == 'external' %} (external){% endif %}{% if not loop.last %}, {% endif %}
+                {% endfor %}
+            </td>
+            <td>
+                {% set managers = r.fulfillments | selectattr('managed_by_name') | map(attribute='managed_by_name') | unique | list %}
+                {{ managers | join(', ') if managers else '-' }}
+            </td>
+            <td>{{ r.completed_date or "-" }}</td>
+        </tr>
+        {% endfor %}
+        {% if not fulfilled_requests %}
+        <tr><td colspan="7">No fulfilled requests yet.</td></tr>
+        {% endif %}
+    </table>
+</body>
+</html>

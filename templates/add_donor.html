@@ -1,0 +1,55 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Add Donor</title>
+</head>
+<body>
+    <h2>Add Donor</h2>
+    <a href="{{ url_for('donors_list') }}">&larr; Back to Donors</a>
+    | <a href="{{ url_for('logout') }}">Logout</a>
+    <hr>
+
+    {% if error %}
+        <p style="color: red;">{{ error }}</p>
+    {% endif %}
+
+    <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+    <label>ID:</label><br>
+    <input type="text" name="donor_code" placeholder="e.g. 2021331045"><br><br>
+
+    <label>Department:</label><br>
+    <select name="department">
+        <option value="">-- Select --</option>
+        {% for d in departments %}
+        <option value="{{ d }}">{{ d }}</option>
+        {% endfor %}
+    </select><br><br>
+
+    <label>Name:</label><br>
+    <input type="text" name="name" required><br><br>
+
+    <label>Blood Group:</label><br>
+    <select name="blood_group" required>
+        <option value="A+">A+</option>
+        <option value="A-">A-</option>
+        <option value="B+">B+</option>
+        <option value="B-">B-</option>
+        <option value="AB+">AB+</option>
+        <option value="AB-">AB-</option>
+        <option value="O+">O+</option>
+        <option value="O-">O-</option>
+    </select><br><br>
+
+    <label>Phone:</label><br>
+    <input type="text" name="phone" required><br><br>
+
+    <label>Area:</label><br>
+    <input type="text" name="area" placeholder="e.g. Mirpur, Dhaka" required>
+    <br><small>Be as specific as possible (area/city name) for accurate map matching</small><br><br>
+
+    <button type="submit">Add Donor</button>
+</form>
+</body>
+</html>

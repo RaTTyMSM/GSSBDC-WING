@@ -1,0 +1,80 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Donors</title>
+</head>
+<body>
+    <h2>Donors</h2>
+    <a href="{{ url_for('home') }}">&larr; Back to Dashboard</a>
+    {% if has_permission(session_member, 'add_donor') %}
+        | <a href="{{ url_for('add_donor_page') }}">+ Add Donor</a>
+    {% endif %}
+    {% if has_permission(session_member, 'view_contacts') %}
+        | <a href="{{ url_for('contacts_list') }}">Contact History</a>
+    {% endif %}
+    | <a href="{{ url_for('logout') }}">Logout</a>
+<hr>
+
+    <form method="GET">
+        <label>Filter by Blood Group:</label>
+        <select name="blood_group">
+            <option value="">All</option>
+            <option value="A+" {% if selected_group == "A+" %}selected{% endif %}>A+</option>
+            <option value="A-" {% if selected_group == "A-" %}selected{% endif %}>A-</option>
+            <option value="B+" {% if selected_group == "B+" %}selected{% endif %}>B+</option>
+            <option value="B-" {% if selected_group == "B-" %}selected{% endif %}>B-</option>
+            <option value="AB+" {% if selected_group == "AB+" %}selected{% endif %}>AB+</option>
+            <option value="AB-" {% if selected_group == "AB-" %}selected{% endif %}>AB-</option>
+            <option value="O+" {% if selected_group == "O+" %}selected{% endif %}>O+</option>
+            <option value="O-" {% if selected_group == "O-" %}selected{% endif %}>O-</option>
+        </select>
+        <button type="submit">Search</button>
+    </form>
+    <br>
+
+
+
+    <table border="1" cellpadding="8" cellspacing="0">
+        <tr>
+            <th>Serial</th>
+            <th>ID</th>
+            <th>Department</th>
+            <th>Name</th>
+            <th>Blood Group</th>
+            <th>Phone</th>
+            <th>Area</th>
+            <th>Status</th>
+            <th>Actions</th>
+            </tr>
+            {% for donor in donors %}
+            <tr>
+                <td>{{ loop.index }}</td>
+                <td>{{ donor.donor_code or "-" }}</td>
+                <td>{{ donor.department or "-" }}</td>
+                <td>{{ donor.name }}</td>
+                <td>{{ donor.blood_group }}</td>
+                <td>{{ donor.phone }}</td>
+                <td>{{ donor.area }}</td>
+                <td>{{ "Active" if donor.active else "Inactive" }}</td>
+                <td>
+                    {% if has_permission(session_member, 'contact_donor') %}
+                        <a href="{{ url_for('contact_donor_page', donor_id=donor.id) }}">Record Contact</a>
+                    {% endif %}
+                    {% if has_permission(session_member, 'edit_donor') %}
+                        | <a href="{{ url_for('edit_donor_page', donor_id=donor.id) }}">Edit</a>
+                    {% endif %}
+                    {% if has_permission(session_member, 'delete_donor') and donor.active %}
+                        <form method="POST" action="{{ url_for('delete_donor', donor_id=donor.id) }}" style="display:inline" onsubmit="return confirm('Mark this donor as inactive? Their history is kept, but they will stop showing up as an active donor.');">
+                        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                            <button type="submit">Deactivate</button>
+                        </form>
+                    {% endif %}
+                </td>
+            </tr>
+            {% endfor %}
+            {% if not donors %}
+            <tr><td colspan="9">No donor found.</td></tr>
+            {% endif %}
+    </table>
+</body>
+</html>

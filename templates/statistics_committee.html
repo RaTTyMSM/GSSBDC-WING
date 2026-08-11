@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Committee Statistics</title>
+</head>
+<body>
+    <h2>Committee-based Statistics</h2>
+    <a href="{{ url_for('statistics_page') }}">&larr; Back to Statistics</a>
+    | <a href="{{ url_for('logout') }}">Logout</a>
+    <hr>
+
+    <p>
+        <a href="{{ url_for('statistics_page') }}">Monthly</a>
+        &nbsp;|&nbsp; <strong>Committee-based Statistics</strong>
+        &nbsp;|&nbsp; <a href="{{ url_for('statistics_yearly_page') }}">Yearly</a>
+    </p>
+    <hr>
+
+    <h3>Select a Committee Term</h3>
+    <ul>
+        {% for c in committees %}
+        <li>
+            <a href="{{ url_for('statistics_committee_page', committee_id=c.id) }}">{{ c.label }}</a>
+        </li>
+        {% endfor %}
+        {% if not committees %}
+        <li>No committee terms have been set up yet. <a href="{{ url_for('manage_committees') }}">Set one up here.</a></li>
+        {% endif %}
+    </ul>
+
+    {% if committee %}
+    <hr>
+    <h3>{{ committee_label }}</h3>
+    <p>Total Club Donations: {{ summary.total_donations }}</p>
+    <p>Total Blood Collected (Club): {{ summary.total_bags }} Bags</p>
+    <p>Fulfilled Requests: {{ summary.fulfilled_requests }}</p>
+    <p>Partial Requests: {{ summary.partial_requests }}</p>
+    <p>Incomplete Requests: {{ summary.incomplete_requests }}</p>
+    <p>Donors Contacted: {{ summary.total_contacts }}</p>
+    <p>Donors Agreed: {{ summary.total_agreed }}</p>
+    <p>Donors Donated: {{ summary.total_donated }}</p>
+    <p>Failed Contacts: {{ summary.total_failed }}</p>
+
+    <h4>Member Performance &mdash; {{ committee_label }}</h4>
+    <table border="1" cellpadding="8" cellspacing="0">
+        <tr>
+            <th>Serial</th>
+            <th>Name</th>
+            <th>Designation</th>
+            <th>Contacted</th>
+            <th>Agreed</th>
+            <th>Donated</th>
+            <th>Failed</th>
+            <th>Requests Managed</th>
+            <th>Blood Managed</th>
+        </tr>
+        {% for row in member_rows %}
+        <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ row.name }}</td>
+            <td>{{ row.designation }}</td>
+            <td>{{ row.contacted }}</td>
+            <td>{{ row.agreed }}</td>
+            <td>{{ row.donated }}</td>
+            <td>{{ row.failed }}</td>
+            <td>{{ row.requests_managed }}</td>
+            <td>{{ row.blood_managed }} Bags</td>
+        </tr>
+        {% endfor %}
+        {% if not member_rows %}
+        <tr><td colspan="9">No members found.</td></tr>
+        {% endif %}
+    </table>
+    {% endif %}
+</body>
+</html>

@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Create Blood Request</title>
+</head>
+<body>
+    <h2>Create Blood Request</h2>
+    <a href="{{ url_for('requests_list') }}">&larr; Back to Requests</a>
+    | <a href="{{ url_for('logout') }}">Logout</a>
+    <hr>
+
+    {% if error %}
+        <p style="color: red;">{{ error }}</p>
+    {% endif %}
+
+    <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label>Patient's Problem (optional):</label><br>
+        <textarea name="patient_problem" rows="3" cols="40"></textarea><br><br>
+
+        <label>Blood Group:</label><br>
+        <select name="blood_group" required>
+            <option value="A+">A+</option>
+            <option value="A-">A-</option>
+            <option value="B+">B+</option>
+            <option value="B-">B-</option>
+            <option value="AB+">AB+</option>
+            <option value="AB-">AB-</option>
+            <option value="O+">O+</option>
+            <option value="O-">O-</option>
+        </select><br><br>
+
+        <label>Number of Bags:</label><br>
+        <input type="number" name="bags" min="1" required><br><br>
+
+        <label>Hemoglobin (optional):</label><br>
+        <input type="text" name="hemoglobin" placeholder="e.g. 11.5"><br><br>
+
+        <label>Donation Date:</label><br>
+        <input type="date" name="donation_date" required><br><br>
+
+        <label>Donation Time (optional):</label><br>
+        <input type="time" name="donation_time"><br><br>
+
+        <label>Donation Place:</label><br>
+        <input type="text" name="donation_place" placeholder="e.g. Dhaka Medical College Hospital, Dhaka" required>
+        <br><small>Be as specific as possible (hospital/area/city name) for accurate map matching</small><br><br>
+
+        <label>Contact:</label><br>
+        <input type="text" name="contact" placeholder="Phone number" required><br><br>
+
+        <label>Urgency:</label><br>
+        <select name="urgency" required>
+            <option value="Normal">Normal</option>
+            <option value="Emergency">Emergency</option>
+        </select><br><br>
+
+        <button type="submit">Create Request</button>
+    </form>
+</body>
+</html>

@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Edit Member</title>
+</head>
+<body>
+    <h2>Edit Member — {{ member.name }}</h2>
+    <a href="{{ url_for('members_list') }}">&larr; Back to Members</a>
+        | <a href="{{ url_for('logout') }}">Logout</a>
+<hr>
+
+    {% if error %}
+        <p style="color: red;">{{ error }}</p>
+    {% endif %}
+
+    <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <label>Name:</label><br>
+        <input type="text" name="name" value="{{ member.name }}" required><br><br>
+
+        <label>Phone:</label><br>
+        <input type="text" name="phone" value="{{ member.phone }}"><br><br>
+
+        <label>Email:</label><br>
+        <input type="email" name="email" value="{{ member.email }}"><br><br>
+
+        <label>ID:</label><br>
+        <input type="text" name="member_code" value="{{ member.member_code or '' }}"><br><br>
+
+        <label>Department:</label><br>
+        <select name="department">
+            <option value="">-- Select --</option>
+            {% for d in departments %}
+            <option value="{{ d }}" {% if member.department == d %}selected{% endif %}>{{ d }}</option>
+            {% endfor %}
+        </select><br><br>
+
+        {% if can_change_role %}
+        <label>Role:</label><br>
+        <select name="role" id="role" onchange="toggleTitle()">
+            {% for r in assignable_roles %}
+            <option value="{{ r }}" {% if member.type == r %}selected{% endif %}>{{ r }}</option>
+            {% endfor %}
+        </select><br><br>
+        {% else %}
+        <input type="hidden" name="role" value="{{ member.type }}">
+        <p>Role: {{ member.type }} (you are not allowed to change this member's role)</p>
+        {% endif %}
+
+        <div id="title-field">
+            <label>Designation:</label><br>
+            <select name="title">
+                <option value="">-- None --</option>
+                {% for t in titles %}
+                <option value="{{ t }}" {% if member.title == t %}selected{% endif %}>{{ t }}</option>
+                {% endfor %}
+            </select><br><br>
+
+            <label>Portfolio / Department (optional):</label><br>
+            <input type="text" name="portfolio" value="{{ member.portfolio or '' }}">
+        </div><br>
+
+        <button type="submit">Save Changes</button>
+    </form>
+
+    <script>
+        function toggleTitle() {
+            var role = document.getElementById("role");
+            var titleField = document.getElementById("title-field");
+            if (!role) return;
+            titleField.style.display = (role.value === "Executive") ? "block" : "none";
+        }
+        toggleTitle();
+    </script>
+</body>
+</html>

@@ -1,0 +1,38 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Record Donor Contact</title>
+</head>
+<body>
+    <h2>Record Contact</h2>
+    <a href="{{ url_for('donors_list') }}">&larr; Back to Donors</a>
+    | <a href="{{ url_for('logout') }}">Logout</a>
+    <hr>
+
+    <p>
+        <strong>Donor:</strong> {{ donor.name }}
+        ({{ donor.blood_group }})
+        — {{ donor.phone }}
+        {% if donor.area %} / {{ donor.area }}{% endif %}
+    </p>
+
+    {% if error %}
+        <p style="color: red;">{{ error }}</p>
+    {% endif %}
+
+    <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+
+        <label>Contact Status:</label><br>
+        <select name="status" required>
+            <option value="">-- Select --</option>
+            <option value="Contacted">Contacted</option>
+            <option value="Agreed">Agreed</option>
+            <option value="Donated">Donated</option>
+            <option value="Failed">Failed / Unavailable</option>
+        </select><br><br>
+
+        <button type="submit">Save Contact</button>
+    </form>
+</body>
+</html>

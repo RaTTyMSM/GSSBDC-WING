@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Add Donation</title>
+</head>
+<body>
+    <h2>Add Donation</h2>
+    <a href="{{ url_for('donations_list') }}">&larr; Back to Donations</a>
+    | <a href="{{ url_for('logout') }}">Logout</a>
+    <hr>
+
+    {% if error %}
+        <p style="color: red;">{{ error }}</p>
+    {% endif %}
+
+    <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label>Donor:</label><br>
+        <select name="donor_id" required>
+            <option value="">-- Select Donor --</option>
+            {% for donor in donors %}
+            <option value="{{ donor.id }}">{{ donor.name }} ({{ donor.blood_group }})</option>
+            {% endfor %}
+        </select><br><br>
+
+        <label>Donation Date:</label><br>
+        <input type="date" name="date" required><br><br>
+
+        <label>Number of Bags:</label><br>
+        <input type="number" name="bags" min="1" required><br><br>
+
+        <label>Source:</label><br>
+        <label><input type="radio" name="source" value="club" checked> Club-arranged (counts in club statistics)</label><br>
+        <label><input type="radio" name="source" value="external"> External (donor donated elsewhere on their own &mdash; only kept for eligibility tracking, not counted in club statistics)</label><br><br>
+
+        <button type="submit">Save Donation</button>
+    </form>
+</body>
+</html>

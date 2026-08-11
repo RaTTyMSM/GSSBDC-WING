@@ -1,0 +1,57 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>GSSBDC WING - Dashboard</title>
+</head>
+<body>
+    <h2>GSSBDC WING</h2>
+    <p>
+        Logged in as: <strong>{{ member.name }}</strong>
+        ({{ member.type }}{% if member.title %} - {{ member.title }}{% if member.portfolio %} ({{ member.portfolio }}){% endif %}{% endif %})
+    </p>
+    <a href="{{ url_for('logout') }}">Logout</a>
+    {% if member.type in ["Executive", "General"] %}
+        | <a href="{{ url_for('change_own_password') }}">Change Password</a>
+    {% endif %}
+    | <a href="{{ url_for('logout') }}">Logout</a>
+    <hr>
+
+    <h3>Menu</h3>
+    <ul>
+        {% if has_permission(member, 'view_donors') %}
+        <li><a href="{{ url_for('donors_list') }}">Donors</a></li>
+        {% endif %}
+
+        {% if has_permission(member, 'add_donation') %}
+        <li><a href="{{ url_for('donations_list') }}">Donation Records</a></li>
+        {% endif %}
+
+        {% if has_permission(member, 'view_requests') %}
+        <li><a href="{{ url_for('requests_list') }}">Blood Requests</a></li>
+        {% endif %}
+
+        {% if has_permission(member, 'view_members') %}
+        <li><a href="{{ url_for('members_list') }}">Members</a></li>
+        {% endif %}
+
+        {% if has_permission(member, 'view_notices') %}
+        <li><a href="{{ url_for('notices_list') }}">Notices</a></li>
+        {% endif %}
+
+
+        {% if has_permission(member, 'view_statistics') %}
+        <li><a href="{{ url_for('statistics_page') }}">Statistics</a></li>
+        {% endif %}
+
+        {% if has_permission(member, 'manage_access') %}
+        <li><a href="{{ url_for('manage_access') }}">Manage Access</a></li>
+        {% endif %}
+
+        {% if member.type in ["Admin", "Watcher"] %}
+        <li><a href="{{ url_for('manage_titles') }}">Manage Titles</a></li>
+        <li><a href="{{ url_for('manage_committees') }}">Manage Committees</a></li>
+        {% endif %}
+
+    </ul>
+</body>
+</html>

@@ -1,0 +1,16 @@
+
+.secret_key
+
+
+backups/
+
+
+venv/
+
+
+__pycache__/
+*.pyc
+
+
+.DS_Store
+*.backup

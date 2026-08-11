@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Notices</title>
+</head>
+<body>
+    <h2>Club Notices</h2>
+    <a href="{{ url_for('home') }}">&larr; Back to Dashboard</a>
+    {% if has_permission(session_member, 'manage_notices') %}
+        | <a href="{{ url_for('add_notice_page') }}">+ Add Notice</a>
+    {% endif %}
+    | <a href="{{ url_for('logout') }}">Logout</a>
+    <hr>
+
+    {% for notice in notices %}
+    <div style="border:1px solid #999; padding:10px; margin-bottom:10px;">
+        <h3>
+            {{ notice.title }}
+            {% if notice.priority == "Emergency" %}<span style="color:red;">[EMERGENCY]</span>{% endif %}
+            {% if notice.priority == "Important" %}<span style="color:orange;">[IMPORTANT]</span>{% endif %}
+            {% if not notice.active %}<span style="color:#888;">[INACTIVE]</span>{% endif %}
+        </h3>
+        <p>{{ notice.message }}</p>
+        <p><em>Posted by {{ notice.posted_by_name }} on {{ notice.date }}</em></p>
+
+        {% if has_permission(session_member, 'manage_notices') %}
+            <a href="{{ url_for('edit_notice_page', notice_id=notice.id) }}">Edit</a>
+            |
+            <form method="POST" action="{{ url_for('toggle_notice', notice_id=notice.id) }}" style="display:inline">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit">{{ "Deactivate" if notice.active else "Activate" }}</button>
+            </form>
+            |
+            <form method="POST" action="{{ url_for('delete_notice', notice_id=notice.id) }}" style="display:inline" onsubmit="return confirm('Delete this notice?');">
+            <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                <button type="submit">Delete</button>
+            </form>
+        {% endif %}
+    </div>
+    {% endfor %}
+
+    {% if not notices %}
+        <p>No notices found.</p>
+    {% endif %}
+</body>
+</html>

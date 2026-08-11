@@ -1,0 +1,160 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>All Members</title>
+</head>
+<body>
+    <h2>All Members</h2>
+    <a href="{{ url_for('home') }}">&larr; Back to Dashboard</a>
+    {% if has_permission(session_member, 'manage_members') %}
+        | <a href="{{ url_for('add_member_page') }}">+ Add Member</a>
+    {% endif %}
+    | <a href="{{ url_for('logout') }}">Logout</a>
+    <hr>
+
+    {% if watcher_accounts %}
+    <h3>Watcher Accounts</h3>
+    <table border="1" cellpadding="8" cellspacing="0">
+        <tr>
+            <th>Serial</th>
+            <th>Name</th>
+            <th>Phone</th>
+            <th>Email</th>
+            <th>Status</th>
+        </tr>
+        {% for member in watcher_accounts %}
+        <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ member.name }}</td>
+            <td>{{ member.phone }}</td>
+            <td>{{ member.email or "-" }}</td>
+            <td>{{ "Active" if member.active else "Inactive" }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    <br><br>
+    {% endif %}
+
+    {% if admin_accounts %}
+    <h3>Admin Accounts</h3>
+    <table border="1" cellpadding="8" cellspacing="0">
+        <tr>
+            <th>Serial</th>
+            <th>Name</th>
+            <th>Phone</th>
+            <th>Email</th>
+            <th>Status</th>
+        </tr>
+        {% for member in admin_accounts %}
+        <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ member.name }}</td>
+            <td>{{ member.phone }}</td>
+            <td>{{ member.email or "-" }}</td>
+            <td>{{ "Active" if member.active else "Inactive" }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    <br><br>
+    {% endif %}
+
+    <h3>Executive Committee</h3>
+    <table border="1" cellpadding="8" cellspacing="0">
+        <tr>
+            <th>Serial</th>
+            <th>ID</th>
+            <th>Department</th>
+            <th>Name</th>
+            <th>Phone</th>
+            <th>Email</th>
+            <th>Designation</th>
+            <th>Status</th>
+            {% if has_permission(session_member, 'edit_data') or has_permission(session_member, 'reset_credentials') or has_permission(session_member, 'delete_data') %}
+            <th>Actions</th>
+            {% endif %}
+        </tr>
+        {% for member in executive_members %}
+        <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ member.member_code or "-" }}</td>
+            <td>{{ member.department or "-" }}</td>
+            <td>{{ member.name }}</td>
+            <td>{{ member.phone }}</td>
+            <td>{{ member.email or "-" }}</td>
+            <td>
+                {{ member.title or "Executive" }}
+                {% if member.portfolio %} ({{ member.portfolio }}){% endif %}
+            </td>
+            <td>{{ "Active" if member.active else "Inactive" }}</td>
+            {% if has_permission(session_member, 'edit_data') or has_permission(session_member, 'reset_credentials') or has_permission(session_member, 'delete_data') %}
+            <td>
+                {% if has_permission(session_member, 'edit_data') %}
+                    <a href="{{ url_for('edit_member_page', member_id=member.id) }}">Edit</a>
+                {% endif %}
+                {% if has_permission(session_member, 'reset_credentials') %}
+                    | <a href="{{ url_for('reset_credentials_page', member_id=member.id) }}">Reset Login</a>
+                {% endif %}
+                {% if has_permission(session_member, 'delete_data') %}
+                    <form method="POST" action="{{ url_for('delete_member', member_id=member.id) }}" style="display:inline" onsubmit="return confirm('Delete this member?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <button type="submit">Delete</button>
+                    </form>
+                {% endif %}
+            </td>
+            {% endif %}
+        </tr>
+        {% endfor %}
+        {% if not executive_members %}
+        <tr><td colspan="7">No executive members found.</td></tr>
+        {% endif %}
+    </table>
+
+    <br><br>
+
+    <h3>General Members</h3>
+    <table border="1" cellpadding="8" cellspacing="0">
+        <tr>
+            <th>Serial</th>
+            <th>ID</th>
+            <th>Department</th>
+            <th>Name</th>
+            <th>Phone</th>
+            <th>Email</th>
+            <th>Status</th>
+            {% if has_permission(session_member, 'edit_data') or has_permission(session_member, 'reset_credentials') or has_permission(session_member, 'delete_data') %}
+            <th>Actions</th>
+            {% endif %}
+        </tr>
+        {% for member in general_members %}
+        <tr>
+            <td>{{ loop.index }}</td>
+            <td>{{ member.member_code or "-" }}</td>
+            <td>{{ member.department or "-" }}</td>
+            <td>{{ member.name }}</td>
+            <td>{{ member.phone }}</td>
+            <td>{{ member.email or "-" }}</td>
+            <td>{{ "Active" if member.active else "Inactive" }}</td>
+            {% if has_permission(session_member, 'edit_data') or has_permission(session_member, 'reset_credentials') or has_permission(session_member, 'delete_data') %}
+            <td>
+                {% if has_permission(session_member, 'edit_data') %}
+                    <a href="{{ url_for('edit_member_page', member_id=member.id) }}">Edit</a>
+                {% endif %}
+                {% if has_permission(session_member, 'reset_credentials') %}
+                    | <a href="{{ url_for('reset_credentials_page', member_id=member.id) }}">Reset Login</a>
+                {% endif %}
+                {% if has_permission(session_member, 'delete_data') %}
+                    <form method="POST" action="{{ url_for('delete_member', member_id=member.id) }}" style="display:inline" onsubmit="return confirm('Delete this member?');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                        <button type="submit">Delete</button>
+                    </form>
+                {% endif %}
+            </td>
+            {% endif %}
+        </tr>
+        {% endfor %}
+        {% if not general_members %}
+        <tr><td colspan="6">No general members found.</td></tr>
+        {% endif %}
+    </table>
+</body>
+</html>

@@ -1,0 +1,59 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Edit Donor</title>
+</head>
+<body>
+    <h2>Edit Donor</h2>
+    <a href="{{ url_for('donors_list') }}">&larr; Back to Donors</a>
+    | <a href="{{ url_for('logout') }}">Logout</a>
+    <hr>
+
+    {% if error %}
+        <p style="color: red;">{{ error }}</p>
+    {% endif %}
+
+    <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <label>ID:</label><br>
+        <input type="text" name="donor_code" value="{{ donor.donor_code or '' }}"><br><br>
+
+        <label>Department:</label><br>
+        <select name="department">
+            <option value="">-- Select --</option>
+            {% for d in departments %}
+            <option value="{{ d }}" {% if donor.department == d %}selected{% endif %}>{{ d }}</option>
+            {% endfor %}
+        </select><br><br>
+
+        <label>Name:</label><br>
+        <input type="text" name="name" value="{{ donor.name }}" required><br><br>
+
+        <label>Blood Group:</label><br>
+        <select name="blood_group" required>
+            <option value="A+" {% if donor.blood_group == "A+" %}selected{% endif %}>A+</option>
+            <option value="A-" {% if donor.blood_group == "A-" %}selected{% endif %}>A-</option>
+            <option value="B+" {% if donor.blood_group == "B+" %}selected{% endif %}>B+</option>
+            <option value="B-" {% if donor.blood_group == "B-" %}selected{% endif %}>B-</option>
+            <option value="AB+" {% if donor.blood_group == "AB+" %}selected{% endif %}>AB+</option>
+            <option value="AB-" {% if donor.blood_group == "AB-" %}selected{% endif %}>AB-</option>
+            <option value="O+" {% if donor.blood_group == "O+" %}selected{% endif %}>O+</option>
+            <option value="O-" {% if donor.blood_group == "O-" %}selected{% endif %}>O-</option>
+        </select><br><br>
+
+        <label>Phone:</label><br>
+        <input type="text" name="phone" value="{{ donor.phone }}" required><br><br>
+
+        <label>Area:</label><br>
+        <input type="text" name="area" value="{{ donor.area }}" required>
+        <br><small>Changing the area will re-calculate the map location automatically</small><br><br>
+
+        <label>
+            <input type="checkbox" name="active" {% if donor.active %}checked{% endif %}>
+            Active
+        </label><br><br>
+
+        <button type="submit">Save Changes</button>
+    </form>
+</body>
+</html>

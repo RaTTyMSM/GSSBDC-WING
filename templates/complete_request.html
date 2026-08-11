@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Manage Blood Request</title>
+</head>
+<body>
+    <h2>Request #{{ req.id }} ({{ req.blood_group }}, {{ req.area }})</h2>
+    <a href="{{ url_for('requests_list') }}">&larr; Back to Requests</a>
+    | <a href="{{ url_for('logout') }}">Logout</a>
+    <hr>
+
+    {% if error %}
+        <p style="color: red;">{{ error }}</p>
+    {% endif %}
+
+    <p>
+        <strong>Status:</strong> {{ status }}
+        &nbsp;|&nbsp;
+        <strong>Bags:</strong> {{ req.collected_bags }} / {{ req.bags }} managed
+        {% if status != 'Fulfilled' %}
+            (<strong>{{ remaining }}</strong> bag{{ 's' if remaining != 1 else '' }} still needed)
+        {% endif %}
+        {% if deadline %}
+            <br><strong>Needed by:</strong> {{ req.donation_date or req.created_date }}
+            &nbsp;|&nbsp; <strong>3-day auto-review date:</strong> {{ deadline }}
+        {% endif %}
+    </p>
+
+    <h3>Donors / Sources Recorded So Far</h3>
+    {% if req.fulfillments %}
+    <table border="1" cellpadding="8" cellspacing="0">
+        <tr>
+            <th>Donor</th>
+            <th>Blood Group</th>
+            <th>Bags</th>
+            <th>Source</th>
+            <th>Managed By (club credit)</th>
+            <th>Date</th>
+            <th></th>
+        </tr>
+        {% for f in req.fulfillments %}
+        <tr>
+            <td>{{ f.donor_name }}</td>
+            <td>{{ f.blood_group }}</td>
+            <td>{{ f.bags }}</td>
+            <td>{{ "Club" if f.source == "club" else "External / Family" }}</td>
+            <td>{{ f.managed_by_name or "-" }}{% if f.source == "external" %} <em>(not counted in club stats)</em>{% endif %}</td>
+            <td>{{ f.date }}</td>
+            <td>
+                <form method="POST" style="display:inline;" onsubmit="return confirm('Remove this entry? This will undo its credit and eligibility record.');">
+                    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+                    <input type="hidden" name="action" value="remove">
+                    <input type="hidden" name="fulfillment_id" value="{{ f.id }}">
+                    <button type="submit">Remove</button>
+                </form>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+    {% else %}
+        <p>No donors recorded yet for this request.</p>
+    {% endif %}
+
+    <br>
+
+    {% if status != 'Fulfilled' %}
+    <h3>Add a Donor / Source ({{ remaining }} bag{{ 's' if remaining != 1 else '' }} remaining &mdash; one donor = one bag)</h3>
+
+    <h4>Option A: Club Donor</h4>
+    <form method="POST">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="action" value="add">
+        <input type="hidden" name="source" value="club">
+
+        <label>Search Donor (by name or phone):</label><br>
+        <input type="text" id="donor-search" placeholder="Type name or phone..." onkeyup="filterDonors()" autocomplete="off"><br><br>
+
+        <label>Select Donor (blood group must match, eligible only):</label><br>
+        <select name="donor_id" id="donor-select" size="6">
+            {% for m in candidates %}
+            <option value="{{ m.donor.id }}"
+                data-search="{{ m.donor.name|lower }} {{ m.donor.phone }}"
+                {% if donor_id and donor_id|int == m.donor.id %}selected{% endif %}>
+                {{ m.donor.name }} — {{ m.donor.phone }} — {{ m.donor.area }} ({{ "%.1f"|format(m.distance) }} km away)
+            </option>
+            {% endfor %}
+        </select><br><br>
+        {% if not candidates %}
+            <p style="color: orange;">No eligible matching club donor found for this blood group right now.</p>
+        {% endif %}
+
+        <p style="color:#555;">This donor donates exactly 1 bag. This entry will be credited to <strong>{{ req.blood_group }}</strong> matched, eligible club donors, and to you as the managing member.</p>
+
+        <button type="submit">Add This Donor (1 bag)</button>
+    </form>
+
+    <script>
+        function filterDonors() {
+            var query = document.getElementById("donor-search").value.toLowerCase();
+            var options = document.getElementById("donor-select").options;
+            for (var i = 0; i < options.length; i++) {
+                var text = options[i].getAttribute("data-search") || "";
+                options[i].style.display = text.indexOf(query) !== -1 ? "" : "none";
+            }
+        }
+    </script>
+
+    <br>
+
+    <h4>Option B: External / Family-Arranged Donor</h4>
+    <p style="color:#555;">Use this when the bag was arranged outside the club &mdash; the donor gave blood somewhere else, or the patient's family/others managed it directly. This never counts toward club statistics.</p>
+    <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <input type="hidden" name="action" value="add">
+        <input type="hidden" name="source" value="external">
+
+        <label>Donor Name (optional if unknown):</label><br>
+        <input type="text" name="ext_donor_name" placeholder="Leave blank if unknown"><br><br>
+
+        <label>Donor Phone (optional &mdash; if it matches an existing donor, their record will be reused):</label><br>
+        <input type="text" name="ext_donor_phone"><br><br>
+
+        <label>Blood Group (optional &mdash; not strictly checked):</label><br>
+        <select name="ext_blood_group">
+            <option value="">-- Unknown / Same as requested --</option>
+            {% for bg in ["A+","A-","B+","B-","AB+","AB-","O+","O-"] %}
+            <option value="{{ bg }}">{{ bg }}</option>
+            {% endfor %}
+        </select><br><br>
+
+        <label>
+            <input type="checkbox" name="add_to_donor_list"> Also add this person to our donor list (only if you have their real name &amp; phone)
+        </label><br><br>
+
+        <button type="submit">Add This External Bag (1 bag)</button>
+    </form>
+    {% else %}
+        <p><strong>This request is fully managed.</strong></p>
+    {% endif %}
+</body>
+</html>

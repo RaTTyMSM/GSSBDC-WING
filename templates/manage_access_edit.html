@@ -1,0 +1,28 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Edit Access</title>
+</head>
+<body>
+    <h2>Edit Access — {{ member.name }}</h2>
+    <a href="{{ url_for('manage_access') }}">&larr; Back to Manage Access</a>
+    | <a href="{{ url_for('logout') }}">Logout</a>
+    <hr>
+
+    <form method="POST">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <p>Check the permissions to grant temporarily. Uncheck to revoke.</p>
+
+        {% for perm in grantable_permissions %}
+        <label>
+            <input type="checkbox" name="permissions" value="{{ perm }}"
+                {% if perm in member.temp_permissions %}checked{% endif %}>
+            {{ perm }}
+        </label><br>
+        {% endfor %}
+
+        <br>
+        <button type="submit">Save</button>
+    </form>
+</body>
+</html>

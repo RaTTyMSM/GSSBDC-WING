@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Contact History</title>
+</head>
+<body>
+    <h2>Donor Contact History{% if donor %} &mdash; {{ donor.name }}{% endif %}</h2>
+    <a href="{{ url_for('home') }}">&larr; Back to Dashboard</a>
+    {% if donor %}
+        | <a href="{{ url_for('contacts_list') }}">View All Contacts</a>
+    {% endif %}
+    | <a href="{{ url_for('logout') }}">Logout</a>
+    <hr>
+
+    <table border="1" cellpadding="8" cellspacing="0">
+        <tr>
+            <th>Date</th>
+            <th>Donor</th>
+            <th>Blood Group</th>
+            <th>Contacted By</th>
+            <th>Status</th>
+        </tr>
+        {% for contact in contacts %}
+        <tr>
+            <td>{{ contact.date }}</td>
+            <td>{{ contact.donor_name }}</td>
+            <td>{{ contact.blood_group }}</td>
+            <td>{{ contact.member_name }}</td>
+            <td>{{ contact.status }}</td>
+        </tr>
+        {% endfor %}
+        {% if not contacts %}
+        <tr><td colspan="5">No contact records found.</td></tr>
+        {% endif %}
+    </table>
+</body>
+</html>

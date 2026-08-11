@@ -1,0 +1,42 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Manage Access</title>
+</head>
+<body>
+    <h2>Manage Access</h2>
+    <a href="{{ url_for('home') }}">&larr; Back to Dashboard</a>
+    | <a href="{{ url_for('logout') }}">Logout</a>
+    <hr>
+
+    {% if message %}
+        <p style="color: green;">{{ message }}</p>
+    {% endif %}
+
+    <h3>Select a General Member</h3>
+    <table border="1" cellpadding="8" cellspacing="0">
+        <tr>
+            <th>ID</th>
+            <th>Name</th>
+            <th>Current Extra Permissions</th>
+            <th>Action</th>
+        </tr>
+        {% for member in general_members %}
+        <tr>
+            <td>{{ member.id }}</td>
+            <td>{{ member.name }}</td>
+            <td>
+                {% if member.temp_permissions %}
+                    {{ member.temp_permissions | join(", ") }}
+                {% else %}
+                    <em>None</em>
+                {% endif %}
+            </td>
+            <td>
+                <a href="{{ url_for('manage_access_member', member_id=member.id) }}">Edit Access</a>
+            </td>
+        </tr>
+        {% endfor %}
+    </table>
+</body>
+</html>

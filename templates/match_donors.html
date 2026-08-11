@@ -1,0 +1,40 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Matching Donors</title>
+</head>
+<body>
+    <h2>Matching Donors — Request #{{ req.id }} ({{ req.blood_group }}, {{ req.area }})</h2>
+    <a href="{{ url_for('requests_list') }}">&larr; Back to Requests</a>
+    | <a href="{{ url_for('logout') }}">Logout</a>
+    <hr>
+
+    <table border="1" cellpadding="8" cellspacing="0">
+        <tr>
+            <th>Donor ID</th>
+            <th>Name</th>
+            <th>Phone</th>
+            <th>Area</th>
+            <th>Distance (km)</th>
+            <th>Total Donations</th>
+            <th>Action</th>
+        </tr>
+        {% for m in matches %}
+        <tr>
+            <td>{{ m.donor.id }}</td>
+            <td>{{ m.donor.name }}</td>
+            <td>{{ m.donor.phone }}</td>
+            <td>{{ m.donor.area }}</td>
+            <td>{{ "%.1f"|format(m.distance) }}</td>
+            <td>{{ m.donation_count }} ({{ m.total_bags }} bags)</td>
+            <td>
+                <a href="{{ url_for('complete_request_page', request_id=req.id, donor_id=m.donor.id) }}">Select for Completion</a>
+            </td>
+        </tr>
+        {% endfor %}
+        {% if not matches %}
+        <tr><td colspan="7">No active and eligible donor found.</td></tr>
+        {% endif %}
+    </table>
+</body>
+</html>
