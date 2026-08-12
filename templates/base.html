@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{% block title %}GSSBDC WING{% endblock %}</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=10">
+</head>
+<body class="{% block body_class %}{% endblock %}">
+    {% if nav_member %}
+    <div class="topbar">
+        <span class="brand">GSSBDC WING</span>
+        <a href="{{ url_for('home') }}">Dashboard</a>
+        <span class="user">{{ nav_member.name }} ({{ nav_member.type }})</span>
+
+        <div class="notif-wrap" id="notifWrap">
+            <button type="button" class="notif-btn" id="notifBtn" aria-label="Notifications" title="Notifications">
+                🔔
+                <span class="notif-count" id="notifCount" hidden>0</span>
+            </button>
+            <div class="notif-panel" id="notifPanel" hidden>
+                <div class="notif-panel-head">
+                    <strong>Notifications</strong>
+                    <button type="button" class="notif-clear" id="notifClear">Clear</button>
+                </div>
+                <ul class="notif-list" id="notifList">
+                    <li class="notif-empty">No notifications yet</li>
+                </ul>
+            </div>
+        </div>
+
+        {% if nav_member.type in ["Executive", "General"] %}
+            <a href="{{ url_for('change_own_password') }}">Change Password</a>
+        {% endif %}
+        <a href="{{ url_for('logout') }}">Logout</a>
+    </div>
+    {% endif %}
+
+    {% block content_wrapper %}
+    <div class="container">
+        {% block content %}{% endblock %}
+    </div>
+    {% endblock %}
+
+    <div id="toastStack" class="toast-stack" aria-live="polite"></div>
+
+    {% block scripts %}{% endblock %}
+
+    {% if nav_member %}
+    <script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.7.5/dist/socket.io.min.js"></script>
+    <script>
+    (function () {
+        const STORAGE_KEY = 'gssbdc_notifs_v1';
+        const MAX_STORE = 40;
+
+        const btn = document.getElementById('notifBtn');
+        const panel = document.getElementById('notifPanel');
+        const list = document.getElementById('notifList');
+        const countEl = document.getElementById('notifCount');
+        const clearBtn = document.getElementById('notifClear');
+        const toastStack = document.getElementById('toastStack');
+
+        function loadStore() {
+            try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || '[]'); }
+            catch (e) { return []; }
+        }
+        function saveStore(items) {
+            localStorage.setItem(STORAGE_KEY, JSON.stringify(items.slice(0, MAX_STORE)));
+        }
+
+        function kindIcon(kind) {
+            if (kind === 'request') return '🩸';
+            if (kind === 'notice') return '📢';
+            if (kind === 'member') return '👤';
+            return '🔔';
+        }
+
+        function renderList() {
+            const items = loadStore();
+            const unread = items.filter(i => !i.read).length;
+            if (unread > 0) {
+                countEl.hidden = false;
+                countEl.textContent = unread > 99 ? '99+' : String(unread);
+            } else {
+                countEl.hidden = true;
+            }
+            if (!items.length) {
+                list.innerHTML = '<li class="notif-empty">No notifications yet</li>';
+                return;
+            }
+            list.innerHTML = items.map(i => {
+                const cls = i.read ? 'notif-item' : 'notif-item unread';
+                const when = i.ts ? new Date(i.ts).toLocaleString() : '';
+                return '<li class="' + cls + '" data-id="' + i.id + '">' +
+                    '<a href="' + (i.link || '#') + '">' +
+                    '<span class="notif-ico">' + kindIcon(i.kind) + '</span>' +
+                    '<span class="notif-body">' +
+                    '<strong>' + escapeHtml(i.title || '') + '</strong>' +
+                    '<span class="notif-msg">' + escapeHtml(i.message || '') + '</span>' +
+                    '<span class="notif-time">' + escapeHtml(when) + '</span>' +
+                    '</span></a></li>';
+            }).join('');
+        }
+
+        function escapeHtml(s) {
+            return String(s).replace(/[&<>"']/g, c => ({
+                '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+            })[c]);
+        }
+
+        function pushLocal(n) {
+            const items = loadStore();
+            if (items.some(x => x.id === n.id)) return;
+            items.unshift(Object.assign({ read: false }, n));
+            saveStore(items);
+            renderList();
+        }
+
+        function showToast(n) {
+            const el = document.createElement('div');
+            el.className = 'toast toast-' + (n.kind || 'info');
+            el.innerHTML =
+                '<div class="toast-ico">' + kindIcon(n.kind) + '</div>' +
+                '<div class="toast-body">' +
+                '<strong>' + escapeHtml(n.title || 'Notification') + '</strong>' +
+                '<span>' + escapeHtml(n.message || '') + '</span></div>' +
+                '<button type="button" class="toast-close" aria-label="Dismiss">×</button>';
+            el.querySelector('.toast-close').onclick = () => el.remove();
+            if (n.link) {
+                el.style.cursor = 'pointer';
+                el.addEventListener('click', (e) => {
+                    if (e.target.closest('.toast-close')) return;
+                    window.location.href = n.link;
+                });
+            }
+            toastStack.appendChild(el);
+            setTimeout(() => { el.classList.add('show'); }, 20);
+            setTimeout(() => {
+                el.classList.remove('show');
+                setTimeout(() => el.remove(), 300);
+            }, 6000);
+        }
+
+        function onNotification(n) {
+            if (!n || !n.id) return;
+            pushLocal(n);
+            showToast(n);
+        }
+
+        btn && btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const open = panel.hidden;
+            panel.hidden = !open;
+            if (open) {
+                // mark all read when opened
+                const items = loadStore().map(i => Object.assign({}, i, { read: true }));
+                saveStore(items);
+                renderList();
+            }
+        });
+        clearBtn && clearBtn.addEventListener('click', () => {
+            saveStore([]);
+            renderList();
+        });
+        document.addEventListener('click', (e) => {
+            if (!panel || panel.hidden) return;
+            if (!e.target.closest('#notifWrap')) panel.hidden = true;
+        });
+
+        renderList();
+
+        // Global socket for notifications (and shared with dashboard if present)
+        try {
+            const socket = io({
+                path: '/socket.io',
+                transports: ['polling', 'websocket'],
+                withCredentials: true,
+                reconnection: true
+            });
+            window.__gssbdcSocket = socket;
+            socket.on('notification', onNotification);
+            socket.on('connect_error', (err) => {
+                console.warn('[notif] socket error', err && err.message);
+            });
+        } catch (e) {
+            console.warn('[notif] socket.io failed', e);
+        }
+    })();
+    </script>
+    {% endif %}
+</body>
+</html>

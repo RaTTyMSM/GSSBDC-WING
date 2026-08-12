@@ -1,7 +1,7 @@
 [
     {
         "id": 0,
-        "name": "Watcher",
+        "name": "Watcher.Masum",
         "username": "watcher",
         "password": "scrypt:32768:8:1$v5fAhEde1loxDaBm$6faddf4ffa6e1e0c3032d6028bba75e1821a1949422a122530eb527826123dd8f007a3ef5fd6be0e67826c13915717b2c6c70d69cd69ab8f614c4685ba789c77",
         "type": "Watcher",
@@ -15,19 +15,15 @@
     {
         "id": 4,
         "name": "Md. Mahbubul Alam Masum",
-        "phone": "",
-        "email": "",
+        "phone": "01908817798",
+        "email": "fmnakib@gmail.com",
         "username": "admin.masum",
         "password": "scrypt:32768:8:1$5NA91K9NwynNzgl2$52fcd8b04770450ba129511250c7321cd74e4f4369a1a4560f6faf816cb69f9fd740da80eab9a43c00bcb8d8c46d0d8fef302b098a758cbdd402f2c88b5e4e10",
         "type": "Admin",
         "title": "",
         "active": true,
         "temp_permissions": [],
-        "deleted": false,
-        "requests_managed": 0,
-        "successful_cases": 0,
-        "blood_managed": 0,
-        "donors_contacted": 2
+        "deleted": false
     },
     {
         "id": 5,

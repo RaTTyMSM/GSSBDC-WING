@@ -1,21 +1,14 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Manage Committees</title>
-</head>
-<body>
-    <h2>Manage Committees</h2>
-    <a href="{{ url_for('home') }}">&larr; Back to Dashboard</a>
-    | <a href="{{ url_for('logout') }}">Logout</a>
+{% extends "base.html" %}
+{% block title %}Manage Committees — GSSBDC WING{% endblock %}
+{% block content %}
+<h2>Manage Committees</h2>
     <hr>
 
     {% if error %}
-        <p style="color: red;">{{ error }}</p>
+        <div class="flash-error">{{ error }}</div>
     {% endif %}
 
     <h3>Start a New Committee</h3>
-    <p><small>Notun committee joler din (dayitto neyar din) ta dao. Age-r committee (jodi thake) shei
-    din theke automatically "closed" hoye jabe, ar statistics-e alada vabe count hobe.</small></p>
     <form method="POST">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
         <label>Start Date:</label><br>
@@ -26,7 +19,7 @@
     <hr>
 
     <h3>All Committees</h3>
-    <table border="1" cellpadding="8" cellspacing="0">
+    <table>
         <tr>
             <th>Term</th>
             <th>Start Date</th>
@@ -43,5 +36,4 @@
         <tr><td colspan="3">No committees set up yet.</td></tr>
         {% endif %}
     </table>
-</body>
-</html>
+{% endblock %}

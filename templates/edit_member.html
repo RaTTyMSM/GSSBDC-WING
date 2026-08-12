@@ -1,16 +1,12 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Edit Member</title>
-</head>
-<body>
-    <h2>Edit Member — {{ member.name }}</h2>
+{% extends "base.html" %}
+{% block title %}Edit Member — GSSBDC WING{% endblock %}
+{% block content %}
+<h2>Edit Member — {{ member.name }}</h2>
     <a href="{{ url_for('members_list') }}">&larr; Back to Members</a>
-        | <a href="{{ url_for('logout') }}">Logout</a>
 <hr>
 
     {% if error %}
-        <p style="color: red;">{{ error }}</p>
+        <div class="flash-error">{{ error }}</div>
     {% endif %}
 
     <form method="POST">
@@ -73,5 +69,4 @@
         }
         toggleTitle();
     </script>
-</body>
-</html>
+{% endblock %}

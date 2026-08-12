@@ -1,19 +1,14 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Manage Titles</title>
-</head>
-<body>
-    <h2>Manage Executive Titles</h2>
-    <a href="{{ url_for('home') }}">&larr; Back to Dashboard</a>
-    | <a href="{{ url_for('logout') }}">Logout</a>
+{% extends "base.html" %}
+{% block title %}Manage Titles — GSSBDC WING{% endblock %}
+{% block content %}
+<h2>Manage Executive Titles</h2>
     <hr>
 
     {% if message %}
-        <p style="color: green;">{{ message }}</p>
+        <div class="flash-ok">{{ message }}</div>
     {% endif %}
     {% if error %}
-        <p style="color: red;">{{ error }}</p>
+        <div class="flash-error">{{ error }}</div>
     {% endif %}
 
     <h3>Current Titles (in rank order)</h3>
@@ -29,6 +24,4 @@
         <input type="text" name="new_title" placeholder="e.g. Assistant Secretary" required>
         <button type="submit">Add Title</button>
     </form>
-    <p><small>Notun title list-er sheshe jog hobe (lowest rank). Order change korte hole amay bolo.</small></p>
-</body>
-</html>
+{% endblock %}

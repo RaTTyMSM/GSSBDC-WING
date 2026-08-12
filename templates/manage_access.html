@@ -1,20 +1,15 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Manage Access</title>
-</head>
-<body>
-    <h2>Manage Access</h2>
-    <a href="{{ url_for('home') }}">&larr; Back to Dashboard</a>
-    | <a href="{{ url_for('logout') }}">Logout</a>
+{% extends "base.html" %}
+{% block title %}Manage Access — GSSBDC WING{% endblock %}
+{% block content %}
+<h2>Manage Access</h2>
     <hr>
 
     {% if message %}
-        <p style="color: green;">{{ message }}</p>
+        <div class="flash-ok">{{ message }}</div>
     {% endif %}
 
     <h3>Select a General Member</h3>
-    <table border="1" cellpadding="8" cellspacing="0">
+    <table>
         <tr>
             <th>ID</th>
             <th>Name</th>
@@ -38,5 +33,4 @@
         </tr>
         {% endfor %}
     </table>
-</body>
-</html>
+{% endblock %}

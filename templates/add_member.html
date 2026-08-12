@@ -1,16 +1,11 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Add Member</title>
-</head>
-<body>
-    <h2>Add Member</h2>
-    <a href="{{ url_for('home') }}">&larr; Back to Dashboard</a>
-    | <a href="{{ url_for('logout') }}">Logout</a>
+{% extends "base.html" %}
+{% block title %}Add Member — GSSBDC WING{% endblock %}
+{% block content %}
+<h2>Add Member</h2>
     <hr>
 
     {% if error %}
-        <p style="color: red;">{{ error }}</p>
+        <div class="flash-error">{{ error }}</div>
     {% endif %}
 
     <form method="POST">
@@ -77,5 +72,4 @@
         }
         toggleFields();
     </script>
-</body>
-</html>
+{% endblock %}

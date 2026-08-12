@@ -1,18 +1,13 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Donors</title>
-</head>
-<body>
-    <h2>Donors</h2>
-    <a href="{{ url_for('home') }}">&larr; Back to Dashboard</a>
+{% extends "base.html" %}
+{% block title %}Donors — GSSBDC WING{% endblock %}
+{% block content %}
+<h2>Donors</h2>
     {% if has_permission(session_member, 'add_donor') %}
-        | <a href="{{ url_for('add_donor_page') }}">+ Add Donor</a>
+        <a href="{{ url_for('add_donor_page') }}">+ Add Donor</a>
     {% endif %}
     {% if has_permission(session_member, 'view_contacts') %}
         | <a href="{{ url_for('contacts_list') }}">Contact History</a>
     {% endif %}
-    | <a href="{{ url_for('logout') }}">Logout</a>
 <hr>
 
     <form method="GET">
@@ -28,13 +23,28 @@
             <option value="O+" {% if selected_group == "O+" %}selected{% endif %}>O+</option>
             <option value="O-" {% if selected_group == "O-" %}selected{% endif %}>O-</option>
         </select>
+
+        <label>Department:</label>
+        <select name="department">
+            <option value="">All</option>
+            {% for d in departments %}
+            <option value="{{ d }}" {% if selected_department == d %}selected{% endif %}>{{ d }}</option>
+            {% endfor %}
+        </select>
+
+        <label>Search (name / phone / area / ID):</label>
+        <input type="text" name="search" value="{{ search }}" placeholder="e.g. Rahim or 017...">
+
         <button type="submit">Search</button>
+        {% if selected_group or selected_department or search %}
+            <a href="{{ url_for('donors_list') }}">Clear filters</a>
+        {% endif %}
     </form>
     <br>
 
 
 
-    <table border="1" cellpadding="8" cellspacing="0">
+    <table>
         <tr>
             <th>Serial</th>
             <th>ID</th>
@@ -64,7 +74,7 @@
                         | <a href="{{ url_for('edit_donor_page', donor_id=donor.id) }}">Edit</a>
                     {% endif %}
                     {% if has_permission(session_member, 'delete_donor') and donor.active %}
-                        <form method="POST" action="{{ url_for('delete_donor', donor_id=donor.id) }}" style="display:inline" onsubmit="return confirm('Mark this donor as inactive? Their history is kept, but they will stop showing up as an active donor.');">
+                        <form method="POST" action="{{ url_for('delete_donor', donor_id=donor.id) }}" class="inline-form" onsubmit="return confirm('Mark this donor as inactive? Their history is kept, but they will stop showing up as an active donor.');">
                         <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                             <button type="submit">Deactivate</button>
                         </form>
@@ -76,5 +86,4 @@
             <tr><td colspan="9">No donor found.</td></tr>
             {% endif %}
     </table>
-</body>
-</html>
+{% endblock %}

@@ -1,12 +1,8 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Edit Access</title>
-</head>
-<body>
-    <h2>Edit Access — {{ member.name }}</h2>
+{% extends "base.html" %}
+{% block title %}Edit Access — GSSBDC WING{% endblock %}
+{% block content %}
+<h2>Edit Access — {{ member.name }}</h2>
     <a href="{{ url_for('manage_access') }}">&larr; Back to Manage Access</a>
-    | <a href="{{ url_for('logout') }}">Logout</a>
     <hr>
 
     <form method="POST">
@@ -24,5 +20,4 @@
         <br>
         <button type="submit">Save</button>
     </form>
-</body>
-</html>
+{% endblock %}

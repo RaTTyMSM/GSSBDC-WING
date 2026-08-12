@@ -1,15 +1,11 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Committee Statistics</title>
-</head>
-<body>
-    <h2>Committee-based Statistics</h2>
+{% extends "base.html" %}
+{% block title %}Committee Statistics — GSSBDC WING{% endblock %}
+{% block content %}
+<h2>Committee-based Statistics</h2>
     <a href="{{ url_for('statistics_page') }}">&larr; Back to Statistics</a>
-    | <a href="{{ url_for('logout') }}">Logout</a>
     <hr>
 
-    <p>
+    <p class="subnav">
         <a href="{{ url_for('statistics_page') }}">Monthly</a>
         &nbsp;|&nbsp; <strong>Committee-based Statistics</strong>
         &nbsp;|&nbsp; <a href="{{ url_for('statistics_yearly_page') }}">Yearly</a>
@@ -42,7 +38,7 @@
     <p>Failed Contacts: {{ summary.total_failed }}</p>
 
     <h4>Member Performance &mdash; {{ committee_label }}</h4>
-    <table border="1" cellpadding="8" cellspacing="0">
+    <table>
         <tr>
             <th>Serial</th>
             <th>Name</th>
@@ -72,5 +68,4 @@
         {% endif %}
     </table>
     {% endif %}
-</body>
-</html>
+{% endblock %}

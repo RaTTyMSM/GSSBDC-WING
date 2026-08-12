@@ -1,4 +1,5 @@
-from flask import Flask, render_template, request, session, redirect, url_for, abort
+from flask import Flask, render_template, request, session, redirect, url_for, abort, jsonify
+from flask_socketio import SocketIO, emit, join_room, leave_room
 from core.helpers import (
     load_data, save_data, calculate_distance, geocode_location,
     MEMBER_FILE, DONOR_FILE, REQUEST_FILE, DONATION_FILE, CONTACT_FILE, NOTICE_FILE, COMMITTEE_FILE,
@@ -50,6 +51,16 @@ app.config.update(
     # SESSION_COOKIE_SECURE=True,  # enable when serving over HTTPS
 )
 
+# SocketIO must be created AFTER secret_key so session cookies work on WS
+socketio = SocketIO(
+    app,
+    cors_allowed_origins="*",
+    async_mode="threading",
+    manage_session=True,
+    logger=False,
+    engineio_logger=False,
+)
+
 
 @app.context_processor
 def inject_csrf():
@@ -58,7 +69,11 @@ def inject_csrf():
         session["_csrf_token"] = generate_csrf_token()
     return {"csrf_token": session["_csrf_token"]}
 
-
+@app.context_processor
+def inject_nav_member():
+    """Make the logged-in member available to base.html on every page,
+    even for routes that don't explicitly pass member/session_member."""
+    return {"nav_member": get_current_member()}
 
 @app.before_request
 def check_csrf():
@@ -102,16 +117,166 @@ def require_member():
     return member
 
 
+def _build_dashboard_chart_data():
+    """Shared builder for dashboard charts (page render + live API)."""
+    donors = load_data(DONOR_FILE)
+    donations = load_data(DONATION_FILE)
+    requests_data = load_data(REQUEST_FILE)
+    contacts = load_data(CONTACT_FILE)
+    committees = load_data(COMMITTEE_FILE)
+
+    club_donations = [d for d in donations if d.get("source", "club") != "external"]
+
+    for r in requests_data:
+        r.setdefault("fulfillments", [])
+        r["collected_bags"] = request_collected_bags(r)
+        r["_status"] = compute_request_status(r)
+        r["_period"] = _request_period_key(r)
+
+    blood_group_counts = {}
+    for d in donors:
+        bg = d.get("blood_group") or "Unknown"
+        blood_group_counts[bg] = blood_group_counts.get(bg, 0) + 1
+    bg_order = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]
+    blood_group_labels = [bg for bg in bg_order if bg in blood_group_counts]
+    blood_group_labels += [bg for bg in blood_group_counts if bg not in bg_order]
+
+    return {
+        "blood_groups": {
+            "labels": blood_group_labels,
+            "values": [blood_group_counts[bg] for bg in blood_group_labels]
+        },
+        "six_month_stats": _last_n_months_full(requests_data, club_donations, contacts, 6),
+        "yearly_comparison": _yearly_comparison(requests_data, club_donations, contacts, n=5),
+        "committee_comparison": _committee_comparison(
+            requests_data, club_donations, contacts, committees
+        ),
+    }
+
+
 @app.route("/")
 def home():
     member = require_member()
     if member is None:
         return redirect(url_for("login"))
+
+    chart_data = None
+    if has_permission(member, "view_statistics"):
+        chart_data = _build_dashboard_chart_data()
+
     return render_template(
         "dashboard.html",
         member=member,
-        has_permission=has_permission
+        has_permission=has_permission,
+        chart_data=chart_data
     )
+
+
+@app.route("/api/dashboard-charts")
+def api_dashboard_charts():
+    """JSON endpoint for live dashboard chart refresh."""
+    member = require_member()
+    if member is None:
+        return jsonify({"error": "unauthorized"}), 401
+    if not has_permission(member, "view_statistics"):
+        return jsonify({"error": "forbidden"}), 403
+    return jsonify(_build_dashboard_chart_data())
+
+def _socket_member():
+    """Resolve logged-in member from the Flask session (shared with Socket.IO)."""
+    member_id = session.get("member_id")
+    if not member_id:
+        return None
+    members = load_data(MEMBER_FILE)
+    return next((m for m in members if m.get("id") == member_id and not m.get("deleted")), None)
+
+
+def broadcast_dashboard_charts():
+    """Push latest chart payload to everyone watching the dashboard."""
+    try:
+        data = _build_dashboard_chart_data()
+        socketio.emit("charts_update", data, room="dashboard")
+    except Exception as e:
+        print("broadcast_dashboard_charts error:", e)
+
+
+def push_notification(kind, title, message, link=None, audience="all", extra=None):
+    """Broadcast a real-time notification over Socket.IO.
+
+    audience:
+      - "all"         -> every logged-in client in room notif_all
+      - "executives"  -> Executive / Admin / Watcher only (room notif_exec)
+    """
+    payload = {
+        "id": f"{kind}-{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}",
+        "kind": kind,          # member | notice | request
+        "title": title,
+        "message": message,
+        "link": link or "/",
+        "audience": audience,
+        "ts": datetime.utcnow().isoformat() + "Z",
+    }
+    if extra:
+        payload["extra"] = extra
+    try:
+        room = "notif_exec" if audience == "executives" else "notif_all"
+        socketio.emit("notification", payload, room=room)
+        # executives also sit in notif_all; avoid double-send for "all"
+        print(f"[notif] {kind} -> {room}: {title}")
+    except Exception as e:
+        print("push_notification error:", e)
+
+
+@socketio.on("connect")
+def ws_connect():
+    member = _socket_member()
+    if member is None:
+        print("[ws] connect rejected: no session")
+        return False
+
+    # Everyone logged in receives general notifications
+    join_room("notif_all")
+
+    # Executive-only notices / sensitive alerts
+    if member.get("type") in ("Executive", "Admin", "Watcher"):
+        join_room("notif_exec")
+
+    # Dashboard chart stream (optional permission)
+    if has_permission(member, "view_statistics"):
+        join_room("dashboard")
+        emit("charts_update", _build_dashboard_chart_data())
+
+    print(
+        "[ws] connected:", member.get("name"),
+        "type=", member.get("type"),
+        "rooms=notif_all"
+        + ("+notif_exec" if member.get("type") in ("Executive", "Admin", "Watcher") else "")
+        + ("+dashboard" if has_permission(member, "view_statistics") else "")
+    )
+
+
+@socketio.on("disconnect")
+def ws_disconnect():
+    leave_room("dashboard")
+
+
+@socketio.on("request_charts")
+def ws_request_charts():
+    member = _socket_member()
+    if member is None or not has_permission(member, "view_statistics"):
+        return
+    emit("charts_update", _build_dashboard_chart_data())
+
+
+def _start_dashboard_push_loop():
+    """Background push every few seconds while the server is running."""
+    while True:
+        socketio.sleep(5)
+        try:
+            broadcast_dashboard_charts()
+        except Exception as e:
+            print("dashboard push loop error:", e)
+
 
 @app.route("/login", methods=["GET", "POST"])
 def login():
@@ -267,6 +432,15 @@ def add_member_page():
 
         members.append(new_member)
         save_data(MEMBER_FILE, members)
+        push_notification(
+            kind="member",
+            title="New member added",
+            message=f"{name} joined as {role}"
+                     + (f" ({title})" if title else ""),
+            link=url_for("members_list"),
+            audience="all",
+            extra={"member_id": new_id, "role": role},
+        )
         return redirect(url_for("members_list"))
 
     return render_template("add_member.html", addable_roles=addable_roles, executive_titles=get_executive_titles(), departments=get_departments())
@@ -334,14 +508,31 @@ def donors_list():
     if selected_group:
         donors = [d for d in donors if d.get("blood_group") == selected_group]
 
+    selected_department = request.args.get("department", "")
+    if selected_department:
+        donors = [d for d in donors if d.get("department") == selected_department]
+
+    search = request.args.get("search", "").strip()
+    if search:
+        needle = search.lower()
+        donors = [
+            d for d in donors
+            if needle in d.get("name", "").lower()
+            or needle in d.get("phone", "").lower()
+            or needle in d.get("area", "").lower()
+            or needle in (d.get("donor_code") or "").lower()
+        ]
+
     return render_template(
         "donors_list.html",
         donors=donors,
         selected_group=selected_group,
+        selected_department=selected_department,
+        search=search,
+        departments=get_departments(),
         session_member=member,
         has_permission=has_permission
     )
-
 
 @app.route("/donors/add", methods=["GET", "POST"])
 def add_donor_page():
@@ -621,6 +812,19 @@ def create_request_page():
         })
 
         save_data(REQUEST_FILE, requests_data)
+        push_notification(
+            kind="request",
+            title="New blood request",
+            message=f"{blood_group} · {bags} bag(s) · {urgency} — {donation_place}",
+            link=url_for("requests_list"),
+            audience="all",
+            extra={
+                "request_id": new_id,
+                "blood_group": blood_group,
+                "bags": bags,
+                "urgency": urgency,
+            },
+        )
         return redirect(url_for("requests_list"))
 
     return render_template("create_request.html")
@@ -1186,6 +1390,11 @@ def notices_list():
     if not can_manage:
         notices = [n for n in notices if n.get("active", True)]
 
+    # Executive-only notices: visible to Executive / Admin / Watcher (and managers)
+    is_exec_viewer = member.get("type") in ("Executive", "Admin", "Watcher") or can_manage
+    if not is_exec_viewer:
+        notices = [n for n in notices if n.get("audience", "all") != "executives"]
+
     notices.sort(key=lambda n: n.get("date", ""), reverse=True)
 
     return render_template(
@@ -1208,12 +1417,15 @@ def add_notice_page():
         title = request.form.get("title", "").strip()
         message = request.form.get("message", "").strip()
         priority = request.form.get("priority", "Normal")
+        audience = request.form.get("audience", "all").strip()
 
         if not title or not message:
             return render_template("add_notice.html", error="Title and message are required.")
 
         if priority not in ("Normal", "Important", "Emergency"):
             priority = "Normal"
+        if audience not in ("all", "executives"):
+            audience = "all"
 
         notices = load_data(NOTICE_FILE)
         new_id = max((n["id"] for n in notices), default=0) + 1
@@ -1223,6 +1435,7 @@ def add_notice_page():
             "title": title,
             "message": message,
             "priority": priority,
+            "audience": audience,  # "all" | "executives"
             "date": date.today().isoformat(),
             "posted_by": member["id"],
             "posted_by_name": member["name"],
@@ -1231,6 +1444,15 @@ def add_notice_page():
 
         notices.append(notice)
         save_data(NOTICE_FILE, notices)
+
+        push_notification(
+            kind="notice",
+            title=f"Notice: {title}",
+            message=message[:120] + ("…" if len(message) > 120 else ""),
+            link=url_for("notices_list"),
+            audience=audience,
+            extra={"notice_id": new_id, "priority": priority},
+        )
         return redirect(url_for("notices_list"))
 
     return render_template("add_notice.html")
@@ -1253,16 +1475,20 @@ def edit_notice_page(notice_id):
         title = request.form.get("title", "").strip()
         message = request.form.get("message", "").strip()
         priority = request.form.get("priority", "Normal")
+        audience = request.form.get("audience", notice.get("audience", "all")).strip()
 
         if not title or not message:
             return render_template("edit_notice.html", notice=notice, error="Title and message are required.")
 
         if priority not in ("Normal", "Important", "Emergency"):
             priority = "Normal"
+        if audience not in ("all", "executives"):
+            audience = "all"
 
         notice["title"] = title
         notice["message"] = message
         notice["priority"] = priority
+        notice["audience"] = audience
         notice["edited_by"] = member["id"]
         notice["edited_by_name"] = member["name"]
         notice["edited_date"] = date.today().isoformat()
@@ -1422,6 +1648,151 @@ def _member_period_credit(member_id, reqs):
     return requests_managed, blood_managed
 
 
+def _last_n_months_bags(club_donations, n=6):
+    """Total club-donated bags for each of the last n months (oldest first),
+    used to drive the dashboard trend chart."""
+    today = date.today()
+    months = []
+    y, m = today.year, today.month
+    for _ in range(n):
+        months.append((y, m))
+        m -= 1
+        if m == 0:
+            m = 12
+            y -= 1
+    months.reverse()
+
+    result = []
+    for (y, m) in months:
+        key = f"{y:04d}-{m:02d}"
+        bags = sum(
+            d.get("bags", 0) for d in club_donations
+            if str(d.get("date", "")).startswith(key)
+        )
+        label = date(y, m, 1).strftime("%b %Y")
+        result.append({"label": label, "bags": bags})
+    return result
+
+
+def _last_n_months_full(requests_data, club_donations, contacts, n=6):
+    """Richer month-by-month stats for the last n months (oldest first).
+    Used on the Monthly statistics page to show trend / good-vs-bad."""
+    today = date.today()
+    months = []
+    y, m = today.year, today.month
+    for _ in range(n):
+        months.append((y, m))
+        m -= 1
+        if m == 0:
+            m = 12
+            y -= 1
+    months.reverse()
+
+    result = []
+    for (y, m) in months:
+        key = f"{y:04d}-{m:02d}"
+        date_from = f"{key}-01"
+        if m == 12:
+            date_to = f"{y + 1}-01-01"
+        else:
+            date_to = f"{y:04d}-{m + 1:02d}-01"
+
+        bags = sum(
+            d.get("bags", 0) for d in club_donations
+            if str(d.get("date", "")).startswith(key)
+        )
+        donations = len([
+            d for d in club_donations
+            if str(d.get("date", "")).startswith(key)
+        ])
+        period_reqs = [r for r in requests_data if _in_range(r.get("_period", ""), date_from, date_to)]
+        breakdown = _status_breakdown(period_reqs)
+        period_contacts = [c for c in contacts if _in_range(c.get("date", ""), date_from, date_to)]
+        donated = len([c for c in period_contacts if c.get("status") == "Donated"])
+        failed = len([c for c in period_contacts if c.get("status") == "Failed"])
+
+        result.append({
+            "label": date(y, m, 1).strftime("%b %Y"),
+            "key": key,
+            "bags": bags,
+            "donations": donations,
+            "fulfilled": breakdown["fulfilled"],
+            "partial": breakdown["partial"],
+            "incomplete": breakdown["incomplete"],
+            "contacts": len(period_contacts),
+            "donated": donated,
+            "failed": failed,
+        })
+    return result
+
+
+def _yearly_comparison(requests_data, club_donations, contacts, n=5):
+    """Stats for the last n calendar years (oldest first) for comparison chart."""
+    current_year = date.today().year
+    years = list(range(current_year - n + 1, current_year + 1))
+    result = []
+    for y in years:
+        date_from = f"{y}-01-01"
+        date_to = f"{y + 1}-01-01"
+        bags = sum(
+            d.get("bags", 0) for d in club_donations
+            if _in_range(d.get("date", ""), date_from, date_to)
+        )
+        donations = len([
+            d for d in club_donations
+            if _in_range(d.get("date", ""), date_from, date_to)
+        ])
+        period_reqs = [r for r in requests_data if _in_range(r.get("_period", ""), date_from, date_to)]
+        breakdown = _status_breakdown(period_reqs)
+        period_contacts = [c for c in contacts if _in_range(c.get("date", ""), date_from, date_to)]
+        result.append({
+            "label": str(y),
+            "year": y,
+            "bags": bags,
+            "donations": donations,
+            "fulfilled": breakdown["fulfilled"],
+            "partial": breakdown["partial"],
+            "incomplete": breakdown["incomplete"],
+            "contacts": len(period_contacts),
+            "donated": len([c for c in period_contacts if c.get("status") == "Donated"]),
+            "failed": len([c for c in period_contacts if c.get("status") == "Failed"]),
+        })
+    return result
+
+
+def _committee_comparison(requests_data, club_donations, contacts, committees):
+    """Stats for every committee term (oldest first) for comparison chart."""
+    ordered = sorted(committees, key=lambda c: c.get("start_date") or "")
+    result = []
+    for c in ordered:
+        date_from = c.get("start_date")
+        date_to = c.get("end_date")  # None = open-ended
+        bags = sum(
+            d.get("bags", 0) for d in club_donations
+            if _in_range(d.get("date", ""), date_from, date_to)
+        )
+        donations = len([
+            d for d in club_donations
+            if _in_range(d.get("date", ""), date_from, date_to)
+        ])
+        period_reqs = [r for r in requests_data if _in_range(r.get("_period", ""), date_from, date_to)]
+        breakdown = _status_breakdown(period_reqs)
+        period_contacts = [c_ for c_ in contacts if _in_range(c_.get("date", ""), date_from, date_to)]
+        result.append({
+            "label": _committee_label(c),
+            "id": c.get("id"),
+            "bags": bags,
+            "donations": donations,
+            "fulfilled": breakdown["fulfilled"],
+            "partial": breakdown["partial"],
+            "incomplete": breakdown["incomplete"],
+            "contacts": len(period_contacts),
+            "donated": len([x for x in period_contacts if x.get("status") == "Donated"]),
+            "failed": len([x for x in period_contacts if x.get("status") == "Failed"]),
+        })
+    return result
+
+
 def _status_breakdown(reqs):
     return {
         "fulfilled": len([r for r in reqs if r["_status"] == "Fulfilled"]),
@@ -1545,6 +1916,23 @@ def statistics_page():
     overall_breakdown = _status_breakdown(requests_data)
     title_order = get_executive_titles()
 
+    blood_group_counts = {}
+    for d in donors:
+        bg = d.get("blood_group") or "Unknown"
+        blood_group_counts[bg] = blood_group_counts.get(bg, 0) + 1
+    bg_order = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]
+    blood_group_counts = {
+        bg: blood_group_counts[bg]
+        for bg in bg_order + [b for b in blood_group_counts if b not in bg_order]
+        if bg in blood_group_counts
+    }
+
+    trend_rows = _last_n_months_bags(club_donations, 6)
+    monthly_trend = {
+        "labels": [row["label"] for row in trend_rows],
+        "bags": [row["bags"] for row in trend_rows]
+    }
+
     month = request.args.get("month", "").strip() or date.today().strftime("%Y-%m")
 
     date_from = f"{month}-01"
@@ -1556,15 +1944,21 @@ def statistics_page():
     summary, member_rows = _period_stats(requests_data, club_donations, contacts, members, title_order, date_from, date_to)
     monthly = {"month": month, **summary}
 
+    # Last 6 months rich stats for the comparison / good-vs-bad chart
+    six_month_stats = _last_n_months_full(requests_data, club_donations, contacts, 6)
+
     return render_template(
         "statistics.html",
         total_donors=len(donors),
         total_donations=len(club_donations),
         overall_bags=overall_bags,
         overall_breakdown=overall_breakdown,
+        blood_group_counts=blood_group_counts,
+        monthly_trend=monthly_trend,
         month=month,
         monthly=monthly,
-        member_rows=member_rows
+        member_rows=member_rows,
+        six_month_stats=six_month_stats,
     )
 
 
@@ -1598,11 +1992,15 @@ def statistics_yearly_page():
     summary, member_rows = _period_stats(requests_data, club_donations, contacts, members, title_order, date_from, date_to)
     yearly = {"year": year, **summary}
 
+    # Multi-year comparison so user can see which year performed best
+    yearly_comparison = _yearly_comparison(requests_data, club_donations, contacts, n=5)
+
     return render_template(
         "statistics_yearly.html",
         year=year,
         yearly=yearly,
-        member_rows=member_rows
+        member_rows=member_rows,
+        yearly_comparison=yearly_comparison,
     )
 
 
@@ -1650,13 +2048,19 @@ def statistics_committee_page():
                 committee.get("start_date"), committee.get("end_date")
             )
 
+    # All committees comparison — which term performed best overall
+    committee_comparison = _committee_comparison(
+        requests_data, club_donations, contacts, committees
+    )
+
     return render_template(
         "statistics_committee.html",
         committees=committees_display,
         committee=committee,
         committee_label=_committee_label(committee) if committee else None,
         summary=summary,
-        member_rows=member_rows
+        member_rows=member_rows,
+        committee_comparison=committee_comparison,
     )
 
 
@@ -1712,4 +2116,11 @@ def logout():
 
 if __name__ == "__main__":
     # Never use debug=True on a public server
-    app.run(debug=os.environ.get("FLASK_DEBUG", "0") == "1", host="127.0.0.1", port=5000)
+    socketio.start_background_task(_start_dashboard_push_loop)
+    socketio.run(
+        app,
+        debug=os.environ.get("FLASK_DEBUG", "0") == "1",
+        host="127.0.0.1",
+        port=5000,
+        allow_unsafe_werkzeug=True,
+    )

@@ -1,20 +1,15 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>All Members</title>
-</head>
-<body>
-    <h2>All Members</h2>
-    <a href="{{ url_for('home') }}">&larr; Back to Dashboard</a>
+{% extends "base.html" %}
+{% block title %}All Members — GSSBDC WING{% endblock %}
+{% block content %}
+<h2>All Members</h2>
     {% if has_permission(session_member, 'manage_members') %}
-        | <a href="{{ url_for('add_member_page') }}">+ Add Member</a>
+        <a href="{{ url_for('add_member_page') }}">+ Add Member</a>
     {% endif %}
-    | <a href="{{ url_for('logout') }}">Logout</a>
     <hr>
 
     {% if watcher_accounts %}
     <h3>Watcher Accounts</h3>
-    <table border="1" cellpadding="8" cellspacing="0">
+    <table>
         <tr>
             <th>Serial</th>
             <th>Name</th>
@@ -37,7 +32,7 @@
 
     {% if admin_accounts %}
     <h3>Admin Accounts</h3>
-    <table border="1" cellpadding="8" cellspacing="0">
+    <table>
         <tr>
             <th>Serial</th>
             <th>Name</th>
@@ -59,7 +54,7 @@
     {% endif %}
 
     <h3>Executive Committee</h3>
-    <table border="1" cellpadding="8" cellspacing="0">
+    <table>
         <tr>
             <th>Serial</th>
             <th>ID</th>
@@ -95,7 +90,7 @@
                     | <a href="{{ url_for('reset_credentials_page', member_id=member.id) }}">Reset Login</a>
                 {% endif %}
                 {% if has_permission(session_member, 'delete_data') %}
-                    <form method="POST" action="{{ url_for('delete_member', member_id=member.id) }}" style="display:inline" onsubmit="return confirm('Delete this member?');">
+                    <form method="POST" action="{{ url_for('delete_member', member_id=member.id) }}" class="inline-form" onsubmit="return confirm('Delete this member?');">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                         <button type="submit">Delete</button>
                     </form>
@@ -112,7 +107,7 @@
     <br><br>
 
     <h3>General Members</h3>
-    <table border="1" cellpadding="8" cellspacing="0">
+    <table>
         <tr>
             <th>Serial</th>
             <th>ID</th>
@@ -143,7 +138,7 @@
                     | <a href="{{ url_for('reset_credentials_page', member_id=member.id) }}">Reset Login</a>
                 {% endif %}
                 {% if has_permission(session_member, 'delete_data') %}
-                    <form method="POST" action="{{ url_for('delete_member', member_id=member.id) }}" style="display:inline" onsubmit="return confirm('Delete this member?');">
+                    <form method="POST" action="{{ url_for('delete_member', member_id=member.id) }}" class="inline-form" onsubmit="return confirm('Delete this member?');">
                     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                         <button type="submit">Delete</button>
                     </form>
@@ -156,5 +151,4 @@
         <tr><td colspan="6">No general members found.</td></tr>
         {% endif %}
     </table>
-</body>
-</html>
+{% endblock %}

@@ -1,15 +1,11 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Matching Donors</title>
-</head>
-<body>
-    <h2>Matching Donors — Request #{{ req.id }} ({{ req.blood_group }}, {{ req.area }})</h2>
+{% extends "base.html" %}
+{% block title %}Matching Donors — GSSBDC WING{% endblock %}
+{% block content %}
+<h2>Matching Donors — Request #{{ req.id }} ({{ req.blood_group }}, {{ req.area }})</h2>
     <a href="{{ url_for('requests_list') }}">&larr; Back to Requests</a>
-    | <a href="{{ url_for('logout') }}">Logout</a>
     <hr>
 
-    <table border="1" cellpadding="8" cellspacing="0">
+    <table>
         <tr>
             <th>Donor ID</th>
             <th>Name</th>
@@ -36,5 +32,4 @@
         <tr><td colspan="7">No active and eligible donor found.</td></tr>
         {% endif %}
     </table>
-</body>
-</html>
+{% endblock %}

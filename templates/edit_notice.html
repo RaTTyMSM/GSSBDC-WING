@@ -1,34 +1,43 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Edit Notice</title>
-</head>
-<body>
-    <h2>Edit Notice</h2>
+{% extends "base.html" %}
+{% block title %}Edit Notice — GSSBDC WING{% endblock %}
+{% block content %}
+<h2>Edit Notice</h2>
     <a href="{{ url_for('notices_list') }}">&larr; Back to Notices</a>
-    | <a href="{{ url_for('logout') }}">Logout</a>
     <hr>
 
     {% if error %}
-        <p style="color: red;">{{ error }}</p>
+        <div class="flash-error">{{ error }}</div>
     {% endif %}
 
     <form method="POST">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="form-row">
         <label>Title:</label><br>
-        <input type="text" name="title" value="{{ notice.title }}" required><br><br>
+        <input type="text" name="title" value="{{ notice.title }}" required>
+        </div>
 
+        <div class="form-row">
         <label>Message:</label><br>
-        <textarea name="message" rows="5" cols="40" required>{{ notice.message }}</textarea><br><br>
+        <textarea name="message" rows="5" required>{{ notice.message }}</textarea>
+        </div>
 
+        <div class="form-row">
         <label>Priority:</label><br>
         <select name="priority">
             <option value="Normal" {% if notice.priority == "Normal" %}selected{% endif %}>Normal</option>
             <option value="Important" {% if notice.priority == "Important" %}selected{% endif %}>Important</option>
             <option value="Emergency" {% if notice.priority == "Emergency" %}selected{% endif %}>Emergency</option>
-        </select><br><br>
+        </select>
+        </div>
+
+        <div class="form-row">
+        <label>Audience:</label><br>
+        <select name="audience">
+            <option value="all" {% if notice.audience|default('all') == 'all' %}selected{% endif %}>All members</option>
+            <option value="executives" {% if notice.audience|default('all') == 'executives' %}selected{% endif %}>Executives only</option>
+        </select>
+        </div>
 
         <button type="submit">Save Changes</button>
     </form>
-</body>
-</html>
+{% endblock %}

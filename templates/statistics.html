@@ -1,23 +1,19 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Statistics</title>
-</head>
-<body>
-    <h2>Statistics</h2>
+{% extends "base.html" %}
+{% block title %}Statistics — GSSBDC WING{% endblock %}
+{% block content %}
+<h2>Statistics</h2>
     <a href="{{ url_for('home') }}">&larr; Back to Dashboard</a>
-    | <a href="{{ url_for('logout') }}">Logout</a>
     <hr>
 
-    <p>
+    <p class="subnav">
         <strong>Monthly</strong>
         &nbsp;|&nbsp; <a href="{{ url_for('statistics_committee_page') }}">Committee-based Statistics</a>
-        &nbsp;|&nbsp; <a href="{{ url_for('statistics_yearly_page') }}">Yearly Statistics</a>
+        &nbsp;|&nbsp; <a href="{{ url_for('statistics_yearly_page') }}">Yearly</a>
     </p>
     <hr>
 
     <h3>Overall Club Statistics (All-Time)</h3>
-    <p style="color:#555;">Only bags managed by our own club members are counted here. Donations logged as "External" or arranged by a patient's family are excluded.</p>
+    <p class="note">Only bags managed by our own club members are counted here. Donations logged as "External" or arranged by a patient's family are excluded.</p>
     <p>Total Donors: {{ total_donors }}</p>
     <p>Total Club Donations Recorded: {{ total_donations }}</p>
     <p>Total Blood Collected (Club): {{ overall_bags }} Bags</p>
@@ -52,7 +48,7 @@
     <p>Failed Contacts: {{ monthly.total_failed }}</p>
 
     <h4>Member Performance &mdash; {{ monthly.month }}</h4>
-    <table border="1" cellpadding="8" cellspacing="0">
+    <table>
         <tr>
             <th>Serial</th>
             <th>Name</th>
@@ -81,5 +77,4 @@
         <tr><td colspan="9">No members found.</td></tr>
         {% endif %}
     </table>
-</body>
-</html>
+{% endblock %}

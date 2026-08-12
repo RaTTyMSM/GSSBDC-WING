@@ -1,20 +1,15 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Blood Requests</title>
-</head>
-<body>
-    <h2>Blood Requests</h2>
-    <a href="{{ url_for('home') }}">&larr; Back to Dashboard</a>
+{% extends "base.html" %}
+{% block title %}Blood Requests — GSSBDC WING{% endblock %}
+{% block content %}
+<h2>Blood Requests</h2>
     {% if has_permission(session_member, 'create_request') %}
-        | <a href="{{ url_for('create_request_page') }}">+ Create Request</a>
+        <a href="{{ url_for('create_request_page') }}">+ Create Request</a>
     {% endif %}
-    | <a href="{{ url_for('logout') }}">Logout</a>
     <hr>
 
     <h3>Open Requests</h3>
-    <p style="color:#555;">Still within the 3-day window and not yet fully managed.</p>
-    <table border="1" cellpadding="8" cellspacing="0">
+    <p class="note">Still within the 3-day window and not yet fully managed.</p>
+    <table>
         <tr>
             <th>ID</th>
             <th>Blood Group</th>
@@ -46,11 +41,11 @@
         {% endif %}
     </table>
 
-    <br><br>
+    <br>
 
     <h3>Partially Managed Requests</h3>
-    <p style="color:#b8860b;">3-day window has passed and it's still short of bags. This is now locked and cannot be edited further.</p>
-    <table border="1" cellpadding="8" cellspacing="0">
+    <p class="flash-warn">3-day window has passed and it's still short of bags. This is now locked and cannot be edited further.</p>
+    <table>
         <tr>
             <th>ID</th>
             <th>Blood Group</th>
@@ -70,11 +65,11 @@
         {% endif %}
     </table>
 
-    <br><br>
+    <br>
 
     <h3>Incomplete Requests</h3>
-    <p style="color:#b22222;">3-day window has passed and nothing was managed for it yet. This is now locked and cannot be edited further.</p>
-    <table border="1" cellpadding="8" cellspacing="0">
+    <p class="flash-error">3-day window has passed and nothing was managed for it yet. This is now locked and cannot be edited further.</p>
+    <table>
         <tr>
             <th>ID</th>
             <th>Blood Group</th>
@@ -94,10 +89,10 @@
         {% endif %}
     </table>
 
-    <br><br>
+    <br>
 
     <h3>Fulfilled Requests</h3>
-    <table border="1" cellpadding="8" cellspacing="0">
+    <table>
         <tr>
             <th>ID</th>
             <th>Blood Group</th>
@@ -129,5 +124,4 @@
         <tr><td colspan="7">No fulfilled requests yet.</td></tr>
         {% endif %}
     </table>
-</body>
-</html>
+{% endblock %}

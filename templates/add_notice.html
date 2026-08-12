@@ -1,16 +1,12 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Add Notice</title>
-</head>
-<body>
-    <h2>Add Notice</h2>
+{% extends "base.html" %}
+{% block title %}Add Notice — GSSBDC WING{% endblock %}
+{% block content %}
+<h2>Add Notice</h2>
     <a href="{{ url_for('notices_list') }}">&larr; Back to Notices</a>
-    | <a href="{{ url_for('logout') }}">Logout</a>
     <hr>
 
     {% if error %}
-        <p style="color: red;">{{ error }}</p>
+        <div class="flash-error">{{ error }}</div>
     {% endif %}
 
     <form method="POST">
@@ -28,7 +24,16 @@
             <option value="Emergency">Emergency</option>
         </select><br><br>
 
+        <label>Audience:</label><br>
+        <select name="audience">
+            <option value="all">All members</option>
+            <option value="executives">Executives only</option>
+        </select>
+        <p class="muted" style="margin-top:4px;font-size:.85rem;">
+            “Executives only” is visible to Executive, Admin &amp; Watcher — not General members.
+        </p>
+        <br>
+
         <button type="submit">Post Notice</button>
     </form>
-</body>
-</html>
+{% endblock %}

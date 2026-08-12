@@ -1,23 +1,22 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Create Blood Request</title>
-</head>
-<body>
-    <h2>Create Blood Request</h2>
+{% extends "base.html" %}
+{% block title %}Create Blood Request — GSSBDC WING{% endblock %}
+{% block content %}
+<h2>Create Blood Request</h2>
     <a href="{{ url_for('requests_list') }}">&larr; Back to Requests</a>
-    | <a href="{{ url_for('logout') }}">Logout</a>
     <hr>
 
     {% if error %}
-        <p style="color: red;">{{ error }}</p>
+        <div class="flash-error">{{ error }}</div>
     {% endif %}
 
     <form method="POST">
     <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
+        <div class="form-row">
         <label>Patient's Problem (optional):</label><br>
-        <textarea name="patient_problem" rows="3" cols="40"></textarea><br><br>
+        <textarea name="patient_problem" rows="3"></textarea>
+        </div>
 
+        <div class="form-row">
         <label>Blood Group:</label><br>
         <select name="blood_group" required>
             <option value="A+">A+</option>
@@ -28,34 +27,48 @@
             <option value="AB-">AB-</option>
             <option value="O+">O+</option>
             <option value="O-">O-</option>
-        </select><br><br>
+        </select>
+        </div>
 
+        <div class="form-row">
         <label>Number of Bags:</label><br>
-        <input type="number" name="bags" min="1" required><br><br>
+        <input type="number" name="bags" min="1" required>
+        </div>
 
+        <div class="form-row">
         <label>Hemoglobin (optional):</label><br>
-        <input type="text" name="hemoglobin" placeholder="e.g. 11.5"><br><br>
+        <input type="text" name="hemoglobin" placeholder="e.g. 11.5">
+        </div>
 
+        <div class="form-row">
         <label>Donation Date:</label><br>
-        <input type="date" name="donation_date" required><br><br>
+        <input type="date" name="donation_date" required>
+        </div>
 
+        <div class="form-row">
         <label>Donation Time (optional):</label><br>
-        <input type="time" name="donation_time"><br><br>
+        <input type="time" name="donation_time">
+        </div>
 
+        <div class="form-row">
         <label>Donation Place:</label><br>
         <input type="text" name="donation_place" placeholder="e.g. Dhaka Medical College Hospital, Dhaka" required>
-        <br><small>Be as specific as possible (hospital/area/city name) for accurate map matching</small><br><br>
+        <br><small class="muted">Be as specific as possible (hospital/area/city name) for accurate map matching</small>
+        </div>
 
+        <div class="form-row">
         <label>Contact:</label><br>
-        <input type="text" name="contact" placeholder="Phone number" required><br><br>
+        <input type="text" name="contact" placeholder="Phone number" required>
+        </div>
 
+        <div class="form-row">
         <label>Urgency:</label><br>
         <select name="urgency" required>
             <option value="Normal">Normal</option>
             <option value="Emergency">Emergency</option>
-        </select><br><br>
+        </select>
+        </div>
 
         <button type="submit">Create Request</button>
     </form>
-</body>
-</html>
+{% endblock %}

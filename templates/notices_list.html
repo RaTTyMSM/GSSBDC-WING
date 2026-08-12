@@ -1,46 +1,41 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Notices</title>
-</head>
-<body>
-    <h2>Club Notices</h2>
-    <a href="{{ url_for('home') }}">&larr; Back to Dashboard</a>
+{% extends "base.html" %}
+{% block title %}Notices — GSSBDC WING{% endblock %}
+{% block content %}
+<h2>Club Notices</h2>
     {% if has_permission(session_member, 'manage_notices') %}
-        | <a href="{{ url_for('add_notice_page') }}">+ Add Notice</a>
+        <a href="{{ url_for('add_notice_page') }}">+ Add Notice</a>
     {% endif %}
-    | <a href="{{ url_for('logout') }}">Logout</a>
     <hr>
 
     {% for notice in notices %}
-    <div style="border:1px solid #999; padding:10px; margin-bottom:10px;">
+    <div class="notice-card{% if notice.priority == 'Emergency' %} emergency{% elif notice.priority == 'Important' %} important{% endif %}{% if not notice.active %} inactive{% endif %}">
         <h3>
             {{ notice.title }}
-            {% if notice.priority == "Emergency" %}<span style="color:red;">[EMERGENCY]</span>{% endif %}
-            {% if notice.priority == "Important" %}<span style="color:orange;">[IMPORTANT]</span>{% endif %}
-            {% if not notice.active %}<span style="color:#888;">[INACTIVE]</span>{% endif %}
+            {% if notice.priority == "Emergency" %}<span class="badge badge-emergency">EMERGENCY</span>{% endif %}
+            {% if notice.priority == "Important" %}<span class="badge badge-important">IMPORTANT</span>{% endif %}
+            {% if notice.audience|default('all') == 'executives' %}<span class="badge badge-exec">EXECUTIVES ONLY</span>{% endif %}
+            {% if not notice.active %}<span class="badge badge-inactive">INACTIVE</span>{% endif %}
         </h3>
         <p>{{ notice.message }}</p>
-        <p><em>Posted by {{ notice.posted_by_name }} on {{ notice.date }}</em></p>
+        <p class="muted"><em>Posted by {{ notice.posted_by_name }} on {{ notice.date }}</em></p>
 
         {% if has_permission(session_member, 'manage_notices') %}
             <a href="{{ url_for('edit_notice_page', notice_id=notice.id) }}">Edit</a>
-            |
-            <form method="POST" action="{{ url_for('toggle_notice', notice_id=notice.id) }}" style="display:inline">
+            &nbsp;|&nbsp;
+            <form method="POST" action="{{ url_for('toggle_notice', notice_id=notice.id) }}" class="inline-form">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
                 <button type="submit">{{ "Deactivate" if notice.active else "Activate" }}</button>
             </form>
-            |
-            <form method="POST" action="{{ url_for('delete_notice', notice_id=notice.id) }}" style="display:inline" onsubmit="return confirm('Delete this notice?');">
+            &nbsp;|&nbsp;
+            <form method="POST" action="{{ url_for('delete_notice', notice_id=notice.id) }}" class="inline-form" onsubmit="return confirm('Delete this notice?');">
             <input type="hidden" name="csrf_token" value="{{ csrf_token }}">
-                <button type="submit">Delete</button>
+                <button type="submit" class="danger">Delete</button>
             </form>
         {% endif %}
     </div>
     {% endfor %}
 
     {% if not notices %}
-        <p>No notices found.</p>
+        <p class="muted">No notices found.</p>
     {% endif %}
-</body>
-</html>
+{% endblock %}

@@ -1,18 +1,13 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Donations</title>
-</head>
-<body>
-    <h2>Donation Records</h2>
-    <a href="{{ url_for('home') }}">&larr; Back to Dashboard</a>
+{% extends "base.html" %}
+{% block title %}Donations — GSSBDC WING{% endblock %}
+{% block content %}
+<h2>Donation Records</h2>
     {% if has_permission(session_member, 'add_donation') %}
-        | <a href="{{ url_for('add_donation_page') }}">+ Add Donation</a>
+        <a href="{{ url_for('add_donation_page') }}">+ Add Donation</a>
     {% endif %}
-    | <a href="{{ url_for('logout') }}">Logout</a>
     <hr>
 
-    <table border="1" cellpadding="8" cellspacing="0">
+    <table>
         <tr>
             <th>Date</th>
             <th>Donor</th>
@@ -33,5 +28,4 @@
         <tr><td colspan="5">No donation records found.</td></tr>
         {% endif %}
     </table>
-</body>
-</html>
+{% endblock %}

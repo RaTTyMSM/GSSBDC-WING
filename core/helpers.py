@@ -3,6 +3,7 @@ import math
 import os
 import requests
 from datetime import date, datetime, timedelta
+from core import db
 
 DONOR_FILE = "data/donors.json"
 DONATION_FILE = "data/donations.json"
@@ -65,11 +66,17 @@ def calculate_distance(
 # =====================================
 
 def load_data(filename):
+    """filename is one of the *_FILE constants above. Data now lives in
+    SQLite (core/db.py) but this keeps returning a plain list of dicts,
+    same as when it read JSON files, so nothing else has to change."""
+    if filename in db.FILE_TO_TABLE:
+        return db.db_load(db.FILE_TO_TABLE[filename])
+    if filename in db.SIMPLE_LIST_TABLES:
+        return db.db_load_simple_list(db.SIMPLE_LIST_TABLES[filename])
 
     try:
         with open(filename, "r") as file:
             return json.load(file)
-
     except (FileNotFoundError, json.JSONDecodeError):
         return []
 
@@ -78,7 +85,14 @@ def load_data(filename):
 # =====================================
 
 def save_data(filename, data):
-    """Write JSON safely: temp file first, then replace (avoids corruption)."""
+    """See load_data() above -- same SQLite routing, same signature."""
+    if filename in db.FILE_TO_TABLE:
+        db.db_save(db.FILE_TO_TABLE[filename], data)
+        return
+    if filename in db.SIMPLE_LIST_TABLES:
+        db.db_save_simple_list(db.SIMPLE_LIST_TABLES[filename], data)
+        return
+
     import tempfile
     directory = os.path.dirname(filename) or "."
     fd, tmp_path = tempfile.mkstemp(dir=directory, suffix=".tmp")
@@ -182,17 +196,9 @@ def add_department(department):
 # Geocode Location (Text -> Lat/Long)
 # =====================================
 
-def geocode_location(place_name):
-    """
-    Converts a place name / address text into (latitude, longitude)
-    using OpenStreetMap's free Nominatim geocoding service.
-    Returns (lat, lon) as floats, or (None, None) if not found.
-    """
+def _try_geocode(query):
+    """One geocoding attempt against Nominatim. Returns (lat, lon) or (None, None)."""
     try:
-        query = place_name.strip()
-        if "bangladesh" not in query.lower():
-            query = f"{query}, Bangladesh"
-
         response = requests.get(
             "https://nominatim.openstreetmap.org/search",
             params={"q": query, "format": "json", "limit": 1},
@@ -201,11 +207,48 @@ def geocode_location(place_name):
         )
         response.raise_for_status()
         results = response.json()
-
         if not results:
             return None, None
-
         return float(results[0]["lat"]), float(results[0]["lon"])
-
     except Exception:
         return None, None
+
+
+def geocode_location(place_name):
+    """
+    Converts a place name / full address into (latitude, longitude) using
+    OpenStreetMap's free Nominatim geocoding service.
+
+    Nominatim often can't resolve a very specific address (house/road
+    number) even though the area it's in is well known. Rather than
+    failing outright and forcing the user to type a shorter/vaguer area,
+    this tries the full address first, then progressively drops the most
+    specific (leftmost) part and retries -- e.g.
+        "House 5, Road 2, Mirpur 10, Dhaka"
+        -> "Road 2, Mirpur 10, Dhaka"
+        -> "Mirpur 10, Dhaka"
+        -> "Dhaka"
+    The exact text the user typed is still what gets saved as the area --
+    this fallback only affects which coordinates we attach to it.
+
+    Returns (lat, lon) as floats, or (None, None) if nothing at all matched.
+    """
+    place_name = (place_name or "").strip()
+    if not place_name:
+        return None, None
+
+    def with_country(q):
+        return q if "bangladesh" in q.lower() else f"{q}, Bangladesh"
+
+    lat, lon = _try_geocode(with_country(place_name))
+    if lat is not None:
+        return lat, lon
+
+    parts = [p.strip() for p in place_name.split(",") if p.strip()]
+    for i in range(1, len(parts)):
+        fallback_query = with_country(", ".join(parts[i:]))
+        lat, lon = _try_geocode(fallback_query)
+        if lat is not None:
+            return lat, lon
+
+    return None, None

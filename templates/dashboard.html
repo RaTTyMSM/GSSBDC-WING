@@ -1,23 +1,15 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>GSSBDC WING - Dashboard</title>
-</head>
-<body>
-    <h2>GSSBDC WING</h2>
+{% extends "base.html" %}
+{% block title %}Dashboard — GSSBDC WING{% endblock %}
+{% block content %}
+<h2>GSSBDC WING</h2>
     <p>
         Logged in as: <strong>{{ member.name }}</strong>
         ({{ member.type }}{% if member.title %} - {{ member.title }}{% if member.portfolio %} ({{ member.portfolio }}){% endif %}{% endif %})
     </p>
-    <a href="{{ url_for('logout') }}">Logout</a>
-    {% if member.type in ["Executive", "General"] %}
-        | <a href="{{ url_for('change_own_password') }}">Change Password</a>
-    {% endif %}
-    | <a href="{{ url_for('logout') }}">Logout</a>
     <hr>
 
     <h3>Menu</h3>
-    <ul>
+    <ul class="menu-grid">
         {% if has_permission(member, 'view_donors') %}
         <li><a href="{{ url_for('donors_list') }}">Donors</a></li>
         {% endif %}
@@ -53,5 +45,281 @@
         {% endif %}
 
     </ul>
-</body>
-</html>
+
+    {% if chart_data %}
+    <hr>
+    <h3>At a Glance
+        <span id="liveBadge" class="live-badge" title="WebSocket live updates">● Connecting…</span>
+        <span id="lastUpdated" class="last-updated"></span>
+    </h3>
+    <div class="chart-grid">
+        <div class="card chart-card">
+            <h4>Donors by Blood Group</h4>
+            <canvas id="bloodGroupChart" height="220"></canvas>
+        </div>
+        <div class="card chart-card">
+            <h4>Last 6 Months — Bags (green = above avg)</h4>
+            <canvas id="sixMonthChart" height="220"></canvas>
+        </div>
+        <div class="card chart-card">
+            <h4>Year Comparison — Bags (green = best)</h4>
+            <canvas id="yearlyCompareChart" height="220"></canvas>
+        </div>
+        <div class="card chart-card">
+            <h4>Committee Comparison — Bags (green = best)</h4>
+            <canvas id="committeeCompareChart" height="220"></canvas>
+        </div>
+    </div>
+    {% endif %}
+{% endblock %}
+
+{% block scripts %}
+{% if chart_data %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.4/dist/chart.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/socket.io-client@4.7.5/dist/socket.io.min.js"></script>
+<script>
+Chart.defaults.devicePixelRatio = window.devicePixelRatio || 2;
+Chart.defaults.font.size = 12;
+
+let bloodGroupChart, sixMonthChart, yearlyCompareChart, committeeCompareChart;
+let pollTimer = null;
+const POLL_FALLBACK_MS = 15000;
+
+function barColorsAboveAvg(values) {
+    if (!values.length) return [];
+    const avg = values.reduce((a, b) => a + b, 0) / values.length;
+    return values.map(v => v >= avg ? '#2a9d8f' : '#e63946');
+}
+
+function barColorsBest(values) {
+    const max = Math.max.apply(null, values.concat([0]));
+    return values.map(v => (v === max && max > 0) ? '#2a9d8f' : '#457b9d');
+}
+
+function richTooltip(rows) {
+    return {
+        callbacks: {
+            afterLabel: function(ctx) {
+                const r = rows[ctx.dataIndex];
+                if (!r) return [];
+                return [
+                    'Donations: ' + r.donations,
+                    'Fulfilled: ' + r.fulfilled,
+                    'Donated: ' + r.donated,
+                    'Failed: ' + r.failed
+                ];
+            }
+        }
+    };
+}
+
+function setBadge(state, text) {
+    const badge = document.getElementById('liveBadge');
+    if (!badge) return;
+    badge.classList.remove('ok', 'error', 'syncing');
+    if (state) badge.classList.add(state);
+    if (text) badge.textContent = text;
+}
+
+function setLastUpdated() {
+    const el = document.getElementById('lastUpdated');
+    if (!el) return;
+    el.textContent = 'Updated ' + new Date().toLocaleTimeString();
+}
+
+function buildCharts(data) {
+    bloodGroupChart = new Chart(document.getElementById('bloodGroupChart'), {
+        type: 'bar',
+        data: {
+            labels: data.blood_groups.labels,
+            datasets: [{
+                label: 'Donors',
+                data: data.blood_groups.values,
+                backgroundColor: '#c62828',
+                borderRadius: 4
+            }]
+        },
+        options: {
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true, ticks: { precision: 0, stepSize: 1 } } }
+        }
+    });
+
+    const six = data.six_month_stats || [];
+    const sixBags = six.map(r => r.bags);
+    sixMonthChart = new Chart(document.getElementById('sixMonthChart'), {
+        type: 'bar',
+        data: {
+            labels: six.map(r => r.label),
+            datasets: [{
+                label: 'Bags Collected',
+                data: sixBags,
+                backgroundColor: barColorsAboveAvg(sixBags),
+                borderRadius: 4
+            }]
+        },
+        options: {
+            plugins: { legend: { display: false }, tooltip: richTooltip(six) },
+            scales: { y: { beginAtZero: true, ticks: { precision: 0, stepSize: 1 } } }
+        }
+    });
+
+    const years = data.yearly_comparison || [];
+    const yearBags = years.map(r => r.bags);
+    yearlyCompareChart = new Chart(document.getElementById('yearlyCompareChart'), {
+        type: 'bar',
+        data: {
+            labels: years.map(r => r.label),
+            datasets: [{
+                label: 'Bags Collected',
+                data: yearBags,
+                backgroundColor: barColorsBest(yearBags),
+                borderRadius: 4
+            }]
+        },
+        options: {
+            plugins: { legend: { display: false }, tooltip: richTooltip(years) },
+            scales: { y: { beginAtZero: true, ticks: { precision: 0, stepSize: 1 } } }
+        }
+    });
+
+    const committees = data.committee_comparison || [];
+    const comBags = committees.map(r => r.bags);
+    committeeCompareChart = new Chart(document.getElementById('committeeCompareChart'), {
+        type: 'bar',
+        data: {
+            labels: committees.map(r => r.label),
+            datasets: [{
+                label: 'Bags Collected',
+                data: comBags,
+                backgroundColor: barColorsBest(comBags),
+                borderRadius: 4
+            }]
+        },
+        options: {
+            plugins: { legend: { display: false }, tooltip: richTooltip(committees) },
+            scales: { y: { beginAtZero: true, ticks: { precision: 0, stepSize: 1 } } }
+        }
+    });
+}
+
+function updateCharts(data) {
+    if (!data || !data.blood_groups) return;
+
+    bloodGroupChart.data.labels = data.blood_groups.labels;
+    bloodGroupChart.data.datasets[0].data = data.blood_groups.values;
+    bloodGroupChart.update('none');
+
+    const six = data.six_month_stats || [];
+    const sixBags = six.map(r => r.bags);
+    sixMonthChart.data.labels = six.map(r => r.label);
+    sixMonthChart.data.datasets[0].data = sixBags;
+    sixMonthChart.data.datasets[0].backgroundColor = barColorsAboveAvg(sixBags);
+    sixMonthChart.options.plugins.tooltip = richTooltip(six);
+    sixMonthChart.update('none');
+
+    const years = data.yearly_comparison || [];
+    const yearBags = years.map(r => r.bags);
+    yearlyCompareChart.data.labels = years.map(r => r.label);
+    yearlyCompareChart.data.datasets[0].data = yearBags;
+    yearlyCompareChart.data.datasets[0].backgroundColor = barColorsBest(yearBags);
+    yearlyCompareChart.options.plugins.tooltip = richTooltip(years);
+    yearlyCompareChart.update('none');
+
+    const committees = data.committee_comparison || [];
+    const comBags = committees.map(r => r.bags);
+    committeeCompareChart.data.labels = committees.map(r => r.label);
+    committeeCompareChart.data.datasets[0].data = comBags;
+    committeeCompareChart.data.datasets[0].backgroundColor = barColorsBest(comBags);
+    committeeCompareChart.options.plugins.tooltip = richTooltip(committees);
+    committeeCompareChart.update('none');
+
+    setLastUpdated();
+}
+
+async function pollOnce() {
+    try {
+        setBadge('syncing', '● Syncing…');
+        const res = await fetch('{{ url_for("api_dashboard_charts") }}', {
+            headers: { 'Accept': 'application/json' },
+            credentials: 'same-origin'
+        });
+        if (!res.ok) throw new Error('HTTP ' + res.status);
+        updateCharts(await res.json());
+        setBadge('ok', '● Live (poll)');
+    } catch (err) {
+        console.warn('Poll failed:', err);
+        setBadge('error', '● Offline');
+    }
+}
+
+function startPollFallback() {
+    if (pollTimer) return;
+    pollOnce();
+    pollTimer = setInterval(pollOnce, POLL_FALLBACK_MS);
+}
+
+function stopPollFallback() {
+    if (pollTimer) {
+        clearInterval(pollTimer);
+        pollTimer = null;
+    }
+}
+
+// Initial server-rendered data
+buildCharts({{ chart_data | tojson }});
+setLastUpdated();
+
+// WebSocket (Socket.IO) — primary live channel
+// Important: start with "polling" so the session cookie is sent reliably,
+// then Socket.IO upgrades to pure WebSocket.
+try {
+    const socket = window.__gssbdcSocket || io({
+        path: '/socket.io',
+        transports: ['polling', 'websocket'],
+        withCredentials: true,
+        reconnection: true,
+        reconnectionAttempts: 10,
+        reconnectionDelay: 1000,
+        reconnectionDelayMax: 8000,
+        timeout: 10000
+    });
+
+    socket.on('connect', function() {
+        console.log('[ws] connected', socket.id, 'transport=', socket.io.engine.transport.name);
+        stopPollFallback();
+        setBadge('ok', '● Live (WebSocket)');
+        socket.emit('request_charts');
+    });
+
+    socket.on('charts_update', function(data) {
+        console.log('[ws] charts_update received');
+        updateCharts(data);
+        setBadge('ok', '● Live (WebSocket)');
+    });
+
+    socket.on('disconnect', function(reason) {
+        console.warn('[ws] disconnect:', reason);
+        setBadge('syncing', '● Reconnecting…');
+        startPollFallback();
+    });
+
+    socket.on('connect_error', function(err) {
+        console.warn('[ws] connect_error:', err && (err.message || err));
+        setBadge('error', '● WS failed → poll');
+        startPollFallback();
+    });
+
+    document.addEventListener('visibilitychange', function() {
+        if (!document.hidden) {
+            if (socket.connected) socket.emit('request_charts');
+            else pollOnce();
+        }
+    });
+} catch (e) {
+    console.warn('Socket.IO unavailable, using HTTP poll:', e);
+    startPollFallback();
+}
+</script>
+{% endif %}
+{% endblock %}

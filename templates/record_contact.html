@@ -1,12 +1,8 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Record Donor Contact</title>
-</head>
-<body>
-    <h2>Record Contact</h2>
+{% extends "base.html" %}
+{% block title %}Record Donor Contact — GSSBDC WING{% endblock %}
+{% block content %}
+<h2>Record Contact</h2>
     <a href="{{ url_for('donors_list') }}">&larr; Back to Donors</a>
-    | <a href="{{ url_for('logout') }}">Logout</a>
     <hr>
 
     <p>
@@ -17,7 +13,7 @@
     </p>
 
     {% if error %}
-        <p style="color: red;">{{ error }}</p>
+        <div class="flash-error">{{ error }}</div>
     {% endif %}
 
     <form method="POST">
@@ -34,5 +30,4 @@
 
         <button type="submit">Save Contact</button>
     </form>
-</body>
-</html>
+{% endblock %}
