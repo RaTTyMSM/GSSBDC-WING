@@ -76,12 +76,18 @@ CREATE TABLE IF NOT EXISTS requests (
 
 CREATE TABLE IF NOT EXISTS fulfillments (
     fid INTEGER PRIMARY KEY AUTOINCREMENT,
+    id INTEGER,
     request_id INTEGER REFERENCES requests(id) ON DELETE CASCADE,
     donor_id INTEGER REFERENCES donors(id),
+    donor_name TEXT,
+    blood_group TEXT,
     bags INTEGER DEFAULT 0,
     source TEXT,
     managed_by INTEGER REFERENCES members(id),
     managed_by_name TEXT,
+    recorded_by INTEGER,
+    recorded_by_name TEXT,
+    donation_id INTEGER,
     date TEXT
 );
 
@@ -187,6 +193,18 @@ def _migrate_missing_columns(conn):
     if "department" not in mem_cols:
         conn.execute("ALTER TABLE members ADD COLUMN department TEXT DEFAULT ''")
 
+    # fulfillments: extra fields the app stores on each entry
+    ful_cols = {row["name"] for row in conn.execute("PRAGMA table_info(fulfillments)")}
+    for col, coltype in [
+        ("id", "INTEGER"),
+        ("donor_name", "TEXT"),
+        ("blood_group", "TEXT"),
+        ("recorded_by", "INTEGER"),
+        ("recorded_by_name", "TEXT"),
+        ("donation_id", "INTEGER"),
+    ]:
+        if col not in ful_cols:
+            conn.execute(f"ALTER TABLE fulfillments ADD COLUMN {col} {coltype}")
 
 # ---------------------------------------------------------------
 # Column definitions per table (order matters for INSERT)
@@ -219,7 +237,11 @@ BOOL_FIELDS = {
     "notices": ["active"],
 }
 
-FULFILLMENT_COLUMNS = ["request_id", "donor_id", "bags", "source", "managed_by", "managed_by_name", "date"]
+FULFILLMENT_COLUMNS = [
+    "request_id", "id", "donor_id", "donor_name", "blood_group", "bags",
+    "source", "managed_by", "managed_by_name", "recorded_by", "recorded_by_name",
+    "donation_id", "date"
+]
 
 # core/helpers.py *_FILE constants -> table name
 FILE_TO_TABLE = {
@@ -257,11 +279,18 @@ def db_load(table):
 
         if table == "requests":
             fulfillments_by_req = {}
-            for f in conn.execute("SELECT * FROM fulfillments ORDER BY fid").fetchall():
-                fd = dict(f)
-                req_id = fd.pop("request_id")
-                fd.pop("fid", None)
-                fulfillments_by_req.setdefault(req_id, []).append(fd)
+            try:
+                for f in conn.execute("SELECT * FROM fulfillments ORDER BY fid").fetchall():
+                    fd = dict(f)
+                    req_id = fd.pop("request_id", None)
+                    fd.pop("fid", None)
+                    if req_id is None:
+                        continue
+                    if fd.get("id") is None:
+                        fd["id"] = fd.get("donation_id") or 0
+                    fulfillments_by_req.setdefault(req_id, []).append(fd)
+            except Exception:
+                fulfillments_by_req = {}
             for r in records:
                 r["fulfillments"] = fulfillments_by_req.get(r["id"], [])
 
@@ -294,11 +323,19 @@ def db_save(table, data):
 
             if table == "requests":
                 for f in record.get("fulfillments", []) or []:
-                    fvals = [record["id"]] + [f.get(c) for c in FULFILLMENT_COLUMNS[1:]]
-                    conn.execute(
-                        f"INSERT INTO fulfillments ({','.join(FULFILLMENT_COLUMNS)}) VALUES ({','.join('?' for _ in FULFILLMENT_COLUMNS)})",
-                        fvals
-                    )
+                    fvals = []
+                    for c in FULFILLMENT_COLUMNS:
+                        if c == "request_id":
+                            fvals.append(record["id"])
+                        else:
+                            fvals.append(f.get(c))
+                    try:
+                        conn.execute(
+                            f"INSERT INTO fulfillments ({','.join(FULFILLMENT_COLUMNS)}) VALUES ({','.join('?' for _ in FULFILLMENT_COLUMNS)})",
+                            fvals
+                        )
+                    except Exception as e:
+                        print("fulfillment insert error:", e)
 
 
 def db_load_simple_list(table):

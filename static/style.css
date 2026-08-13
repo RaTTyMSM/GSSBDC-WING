@@ -895,7 +895,27 @@ body.dashboard-page .container {
   font-weight: 800;
   color: var(--text);
   letter-spacing: -0.03em;
+  font-family: var(--font-ui), system-ui, sans-serif; /* */
+  text-transform: none;
+  white-space: normal;
+  overflow: visible;
+  word-break: break-word;
 }
+
+.dash-greeting {
+  margin: 0;
+  font-size: 1.6rem;
+  font-weight: 700;
+  color: var(--text);
+  font-family: "Barlow", system-ui, sans-serif !important;
+  text-transform: none !important;
+  letter-spacing: normal;
+  white-space: normal;
+  overflow: visible;
+  word-break: break-word;
+  line-height: 1.3;
+}
+
 .dash-hero .subtitle {
   margin: 4px 0 0;
   color: var(--muted);
