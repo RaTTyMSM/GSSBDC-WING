@@ -3,38 +3,40 @@
 {% block body_class %}login-body{% endblock %}
 {% block content_wrapper %}
 <div class="login-page">
-  <svg class="login-bg-lines" viewBox="0 0 1280 800" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
-    <circle cx="1090" cy="20" r="230"/>
-    <circle cx="1195" cy="90" r="300"/>
-    <ellipse cx="1153" cy="192" rx="16" ry="30" transform="rotate(-25 1153 192)" class="lp-leaf"/>
-    <circle cx="35" cy="790" r="230"/>
-    <circle cx="-30" cy="850" r="300"/>
-    <ellipse cx="32" cy="700" rx="16" ry="30" transform="rotate(-25 32 700)" class="lp-leaf"/>
+  <svg class="login-bg-lines" viewBox="0 0 1440 900" preserveAspectRatio="xMidYMid slice" aria-hidden="true">
+    <path d="M40 620 C90 480 220 430 310 560 C360 640 300 760 200 790 C110 770 50 720 40 620 Z"
+          fill="none" stroke="rgba(100,120,110,0.25)" stroke-width="1.5"/>
+    <path d="M1180 60 C1280 10 1400 40 1420 180 C1430 280 1360 340 1280 300 C1200 240 1160 140 1180 60 Z"
+          fill="none" stroke="rgba(100,120,110,0.25)" stroke-width="1.5"/>
   </svg>
 
   <div class="login-shell">
-
     <div class="login-left">
       <div class="login-brand-pill">
-        <img class="pill-logo pill-logo-uni" src="{{ url_for('static', filename='img/logo-university.png') }}" alt="Green University of Bangladesh logo">
+        <img class="pill-logo-uni" src="{{ url_for('static', filename='img/logo-university.png') }}" alt="GUB">
         <span class="pill-divider"></span>
-        <img class="pill-logo" src="{{ url_for('static', filename='img/logo-icon.png') }}" alt="GSSBDC logo">
+        <img class="pill-logo-club" src="{{ url_for('static', filename='img/logo-icon.png') }}" alt="GSSBDC">
       </div>
+
       <h1 class="login-title">
         <span class="t-green">GREEN SOCIAL SERVICES AND</span>
         <span class="t-red">BLOOD DONATION CLUB</span>
       </h1>
+
       <div class="login-tagline">
         <span class="tagline-icon">
-          <img src="{{ url_for('static', filename='img/heart-icon.png') }}" alt="" width="16" height="16">
+          <img src="{{ url_for('static', filename='img/heart-icon.png') }}" alt="">
         </span>
-        <div>
+        <div class="tagline-text">
           <p class="tagline-title">Donate Blood, Save Lives</p>
-          <p class="tagline-sub">Connect with the club and make a difference.</p>
+          <p class="tagline-sub">Connect with our club and make a difference.</p>
         </div>
       </div>
 
-      <p class="login-copyright">© {{ current_year or 2026 }} GSSBDC WING. All rights reserved. Registered Blood Donor Club network.</p>
+      <p class="login-copyright">
+        © {{ current_year or 2026 }} GSSBDC WING. All rights reserved.
+        Registered Blood Donor Club network.
+      </p>
     </div>
 
     <div class="login-right">
@@ -43,7 +45,7 @@
         <p class="login-sub">Enter your club credentials to continue</p>
 
         {% if error %}
-          <div class="flash-error">{{ error }}</div>
+        <div class="flash-error">{{ error }}</div>
         {% endif %}
 
         <form method="POST">
@@ -52,7 +54,7 @@
           <div class="form-row">
             <label for="username">Username</label>
             <div class="input-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
               <input type="text" id="username" name="username" placeholder="Enter your username" required autofocus>
             </div>
           </div>
@@ -60,24 +62,27 @@
           <div class="form-row">
             <label for="password">Password</label>
             <div class="input-icon">
-              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="10" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
               <input type="password" id="password" name="password" placeholder="Enter your password" required>
               <button type="button" class="toggle-pw" onclick="toggleLoginPassword()" aria-label="Show password">
-                <svg id="pw-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/></svg>
+                <svg id="pw-eye" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7-11-7-11-7Z"/><circle cx="12" cy="12" r="3"/></svg>
               </button>
             </div>
           </div>
 
-          <button type="submit" class="login-btn">
-            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M12 21s-6.7-4.35-9.3-8.6C.86 9.2 1.9 5.6 5.1 4.6c2-.63 3.9.1 5 1.6h3.8c1.1-1.5 3-2.23 5-1.6 3.2 1 4.24 4.6 2.4 7.8C18.7 16.65 12 21 12 21Z"/></svg>
-            Log in
-          </button>
+          <div class="form-row remember-row">
+            <label class="remember-label">
+              <input type="checkbox" name="remember" value="1">
+              <span>Remember me for 30 days</span>
+            </label>
+          </div>
+
+          <button type="submit" class="login-btn">♥ Log in</button>
         </form>
 
         <p class="login-footer">Only club members with an account can sign in.</p>
       </div>
     </div>
-
   </div>
 </div>
 

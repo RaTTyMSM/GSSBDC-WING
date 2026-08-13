@@ -1,7 +1,7 @@
 {% extends "base.html" %}
-{% block title %}Yearly — GSSBDC WING{% endblock %}
+{% block title %}Yearly Statistics — GSSBDC WING{% endblock %}
 {% block content %}
-<h2>Statistics</h2>
+<h2>Yearly Statistics</h2>
     <a href="{{ url_for('statistics_page') }}">&larr; Back to Statistics</a>
     <hr>
 
@@ -12,15 +12,15 @@
     </p>
     <hr>
 
-    <h3>Yearly</h3>
+    <h3>Select Year</h3>
     <form method="GET">
-        <label>Select Year:</label>
-        <input type="number" name="year" value="{{ year }}" min="2000" max="2100">
+        <label>Year:</label>
+        <input type="number" name="year" value="{{ year }}" min="2000" max="2100" required>
         <button type="submit">View</button>
     </form>
     <br>
 
-    <h4>{{ year }}</h4>
+    <h3>{{ yearly.year }}</h3>
     <p>Total Club Donations: {{ yearly.total_donations }}</p>
     <p>Total Blood Collected (Club): {{ yearly.total_bags }} Bags</p>
     <p>Fulfilled Requests: {{ yearly.fulfilled_requests }}</p>
@@ -31,7 +31,27 @@
     <p>Donors Donated: {{ yearly.total_donated }}</p>
     <p>Failed Contacts: {{ yearly.total_failed }}</p>
 
-    <h4>Member Performance &mdash; {{ year }}</h4>
+    <h4>Bags by Blood Group</h4>
+    <table>
+        <tr><th>Blood Group</th><th>Total Bags</th></tr>
+        {% for bg, bags in bags_by_blood_group.items() %}
+        <tr><td>{{ bg }}</td><td>{{ bags }}</td></tr>
+        {% else %}
+        <tr><td colspan="2">No data.</td></tr>
+        {% endfor %}
+    </table>
+
+    <h4>Donation count by Blood Group</h4>
+    <table>
+        <tr><th>Blood Group</th><th>Donation Count</th></tr>
+        {% for bg, cnt in donation_count_by_blood_group.items() %}
+        <tr><td>{{ bg }}</td><td>{{ cnt }}</td></tr>
+        {% else %}
+        <tr><td colspan="2">No data.</td></tr>
+        {% endfor %}
+    </table>
+
+    <h4>Member Performance &mdash; {{ yearly.year }}</h4>
     <table>
         <tr>
             <th>Serial</th>

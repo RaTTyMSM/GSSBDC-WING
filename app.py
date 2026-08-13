@@ -15,7 +15,7 @@ import os
 import secrets
 
 app = Flask(__name__)
-
+app.jinja_env.globals["has_permission"] = has_permission
 
 def _load_or_create_secret_key():
     """Use GSSBDC_SECRET_KEY from the environment if set (recommended for
@@ -48,6 +48,7 @@ app.secret_key = _load_or_create_secret_key()
 app.config.update(
     SESSION_COOKIE_HTTPONLY=True,
     SESSION_COOKIE_SAMESITE="Lax",
+    PERMANENT_SESSION_LIFETIME=timedelta(days=30),
     # SESSION_COOKIE_SECURE=True,  # enable when serving over HTTPS
 )
 
@@ -116,6 +117,24 @@ def require_member():
         return None
     return member
 
+def _blood_group_donation_stats(club_donations):
+    """Bags + donation-count broken down by blood group (club only)."""
+    bg_order = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]
+    bags = {}
+    counts = {}
+    for d in club_donations:
+        bg = d.get("blood_group") or "Unknown"
+        bags[bg] = bags.get(bg, 0) + int(d.get("bags", 0) or 0)
+        counts[bg] = counts.get(bg, 0) + 1
+    labels = [bg for bg in bg_order if bg in bags or bg in counts]
+    labels += sorted(bg for bg in set(list(bags) + list(counts)) if bg not in bg_order)
+    return {
+        "labels": labels,
+        "bags": [bags.get(bg, 0) for bg in labels],
+        "counts": [counts.get(bg, 0) for bg in labels],
+        "bags_dict": {bg: bags.get(bg, 0) for bg in labels},
+        "counts_dict": {bg: counts.get(bg, 0) for bg in labels},
+    }
 
 def _build_dashboard_chart_data():
     """Shared builder for dashboard charts (page render + live API)."""
@@ -140,18 +159,24 @@ def _build_dashboard_chart_data():
     bg_order = ["A+", "A-", "B+", "B-", "AB+", "AB-", "O+", "O-"]
     blood_group_labels = [bg for bg in bg_order if bg in blood_group_counts]
     blood_group_labels += [bg for bg in blood_group_counts if bg not in bg_order]
+    bg_stats = _blood_group_donation_stats(club_donations)
 
     return {
         "blood_groups": {
             "labels": blood_group_labels,
             "values": [blood_group_counts[bg] for bg in blood_group_labels]
         },
+        "bags_by_blood_group": {
+            "labels": bg_stats["labels"],
+            "values": bg_stats["bags"],
+        },
+        "donation_count_by_blood_group": {
+            "labels": bg_stats["labels"],
+            "values": bg_stats["counts"],
+        },
         "six_month_stats": _last_n_months_full(requests_data, club_donations, contacts, 6),
-        "yearly_comparison": _yearly_comparison(requests_data, club_donations, contacts, n=5),
-        "committee_comparison": _committee_comparison(
-            requests_data, club_donations, contacts, committees
-        ),
     }
+
 
 
 @app.route("/")
@@ -299,6 +324,13 @@ def login():
                 session.clear()
                 session["member_id"] = member["id"]
                 session["_csrf_token"] = generate_csrf_token()
+
+                # Remember me → cookie 30 days. 
+                if request.form.get("remember") == "1":
+                    session.permanent = True
+                else:
+                    session.permanent = False
+
                 return redirect(url_for("home"))
 
         return render_template("login.html", error="Invalid username or password.")
@@ -1946,6 +1978,7 @@ def statistics_page():
 
     # Last 6 months rich stats for the comparison / good-vs-bad chart
     six_month_stats = _last_n_months_full(requests_data, club_donations, contacts, 6)
+    bg_stats = _blood_group_donation_stats(club_donations)
 
     return render_template(
         "statistics.html",
@@ -1959,6 +1992,8 @@ def statistics_page():
         monthly=monthly,
         member_rows=member_rows,
         six_month_stats=six_month_stats,
+        bags_by_blood_group=bg_stats["bags_dict"],
+        donation_count_by_blood_group=bg_stats["counts_dict"],
     )
 
 
@@ -1991,6 +2026,11 @@ def statistics_yearly_page():
 
     summary, member_rows = _period_stats(requests_data, club_donations, contacts, members, title_order, date_from, date_to)
     yearly = {"year": year, **summary}
+    period_donations = [
+        d for d in club_donations
+        if (d.get("date") or "") >= date_from and (d.get("date") or "") < date_to
+    ]
+    bg_stats = _blood_group_donation_stats(period_donations)
 
     # Multi-year comparison so user can see which year performed best
     yearly_comparison = _yearly_comparison(requests_data, club_donations, contacts, n=5)
@@ -2001,6 +2041,8 @@ def statistics_yearly_page():
         yearly=yearly,
         member_rows=member_rows,
         yearly_comparison=yearly_comparison,
+        bags_by_blood_group=bg_stats["bags_dict"],
+        donation_count_by_blood_group=bg_stats["counts_dict"],
     )
 
 
@@ -2047,11 +2089,21 @@ def statistics_committee_page():
                 requests_data, club_donations, contacts, members, title_order,
                 committee.get("start_date"), committee.get("end_date")
             )
+            start = committee.get("start_date") or ""
+            end = committee.get("end_date") or "9999-12-31"
+            period_donations = [
+                d for d in club_donations
+                if start <= (d.get("date") or "") <= end
+            ]
+            bg_stats = _blood_group_donation_stats(period_donations)
 
     # All committees comparison — which term performed best overall
     committee_comparison = _committee_comparison(
         requests_data, club_donations, contacts, committees
     )
+    
+    if committee is None:
+            bg_stats = {"bags_dict": {}, "counts_dict": {}}
 
     return render_template(
         "statistics_committee.html",
@@ -2061,6 +2113,8 @@ def statistics_committee_page():
         summary=summary,
         member_rows=member_rows,
         committee_comparison=committee_comparison,
+        bags_by_blood_group=bg_stats["bags_dict"],
+        donation_count_by_blood_group=bg_stats["counts_dict"],
     )
 
 

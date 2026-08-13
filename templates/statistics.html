@@ -28,6 +28,27 @@
 
     <hr>
 
+        <h3>Bags by Blood Group</h3>
+    <table>
+        <tr><th>Blood Group</th><th>Total Bags</th></tr>
+        {% for bg, bags in bags_by_blood_group.items() %}
+        <tr><td>{{ bg }}</td><td>{{ bags }}</td></tr>
+        {% else %}
+        <tr><td colspan="2">No data.</td></tr>
+        {% endfor %}
+    </table>
+
+    <h3>Donation count by Blood Group</h3>
+    <table>
+        <tr><th>Blood Group</th><th>Donation Count</th></tr>
+        {% for bg, cnt in donation_count_by_blood_group.items() %}
+        <tr><td>{{ bg }}</td><td>{{ cnt }}</td></tr>
+        {% else %}
+        <tr><td colspan="2">No data.</td></tr>
+        {% endfor %}
+    </table>
+    <hr>
+
     <h3>Monthly Statistics</h3>
     <form method="GET">
         <label>Select Month:</label>
