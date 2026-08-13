@@ -10,7 +10,10 @@ from core.helpers import (
 from modules.donation import get_eligibility, create_automatic_donation
 from datetime import date, datetime, timedelta
 from core.permissions import has_permission, GRANTABLE_PERMISSIONS, can_add_role, can_assign_role, ASSIGNABLE_ROLES, get_executive_titles
-from core.security import hash_password, verify_password, is_hashed, generate_csrf_token, validate_csrf
+from core.security import (
+    hash_password, verify_password, is_hashed, generate_csrf_token, validate_csrf,
+    is_login_blocked, record_login_failure, clear_login_failures,
+)
 import os
 import secrets
 
@@ -378,11 +381,18 @@ def login():
         username = (request.form.get("username") or "").strip()
         password = request.form.get("password") or ""
 
+        lock_key = username.lower()
+        if is_login_blocked(lock_key):
+            log.warning("login_blocked", username=username)
+            return render_template("login.html", error="Too many failed attempts. Please try again in a few minutes.")
+
         members = load_data(MEMBER_FILE)
 
         for member in members:
             if member.get("username", "").lower() == username.lower():
                 if not verify_password(password, member.get("password", "")):
+                    record_login_failure(lock_key)
+                    log.warning("login_failed", username=username)
                     break
                 if not member.get("active", True):
                     return render_template("login.html", error="Your account is inactive.")
@@ -390,6 +400,7 @@ def login():
                 if not is_hashed(member.get("password", "")):
                     member["password"] = hash_password(password)
                     save_data(MEMBER_FILE, members)
+                clear_login_failures(lock_key)
                 session.clear()
                 session["member_id"] = member["id"]
                 log.info("login_success", user_id=member["id"], username=username, role=member.get("type"))
@@ -402,7 +413,8 @@ def login():
                     session.permanent = False
 
                 return redirect(url_for("home"))
-                log.warning("login_failed", username=username)
+        else:
+            log.warning("login_failed", username=username, reason="unknown_username")
         return render_template("login.html", error="Invalid username or password.")
 
 
