@@ -65,7 +65,7 @@ a:hover { text-decoration: underline; }
 
 /* ---------- Topbar (Riot-style horizontal) ---------- */
 .topbar {
-  background: #4b6b62;
+  background: #ffffff;
   color: #fff;
   padding: 0 20px;
   min-height: 56px;
@@ -90,8 +90,28 @@ a:hover { text-decoration: underline; }
   padding: 8px 0;
   white-space: nowrap;
 }
-.topbar .brand::before { content: "🩸 "; }
-.topbar .brand:hover { color: #ccfbf1 !important; }
+.topbar .brand {
+  display: inline-flex !important;
+  align-items: center;
+  gap: 8px;
+  font-weight: 800;
+  font-size: 0.95rem;
+  color: #518d62 !important;
+  text-decoration: none !important;
+  margin-right: 12px;
+  white-space: nowrap;
+}
+.topbar .brand-logo {
+  height: 28px !important;
+  width: 28px !important;
+  display: inline-block !important;
+  object-fit: contain;
+  flex-shrink: 0;
+  visibility: visible !important;
+  opacity: 1 !important;
+}
+
+.topbar .brand:hover { color: #345e40 !important; }
 
 .topnav {
   display: flex;
@@ -101,7 +121,7 @@ a:hover { text-decoration: underline; }
   flex: 1;
 }
 .topnav a {
-  color: rgba(255,255,255,.78) !important;
+  color: rgba(5, 5, 5, 0.7) !important;
   font-size: 0.82rem;
   font-weight: 600;
   letter-spacing: 0.04em;
@@ -112,7 +132,7 @@ a:hover { text-decoration: underline; }
   opacity: 1;
 }
 .topnav a:hover {
-  color: #fff !important;
+  color: #1b1818 !important;
   background: rgba(255,255,255,.08);
 }
 
@@ -124,7 +144,7 @@ a:hover { text-decoration: underline; }
 }
 .topbar .user {
   font-size: 0.82rem;
-  color: rgba(255,255,255,.7);
+  color: rgba(5, 5, 5, 0.7);
   background: rgba(255,255,255,.08);
   border: 1px solid rgba(255,255,255,.12);
   border-radius: 999px;
@@ -369,10 +389,10 @@ body.login-body {
   max-width: 920px;
   display: grid;
   grid-template-columns: 1fr 1fr;
-  background: #c8dccf;
+  background: #a7bbad;
   border-radius: 28px;
   overflow: hidden;
-  box-shadow: 0 24px 50px -14px rgba(36, 59, 48, 0.32);
+  box-shadow: 0 24px 50px -14px rgba(2, 3, 3, 0.32);
   padding: 22px;
   gap: 16px;
 }
@@ -494,7 +514,7 @@ body.login-body {
   margin: 0;
   font-size: 0.8rem;
   font-weight: 400;
-  color: #5f6f66;
+  color: #3f4441;
   line-height: 1.35;
 }
 
@@ -505,7 +525,7 @@ body.login-body {
   margin-bottom: 0;
   font-size: 0.68rem;
   line-height: 1.45;
-  color: #6e7d74;
+  color: #3f4441;
   text-align: left;
   max-width: 360px;
 }
@@ -607,7 +627,7 @@ body.login-body {
 .login-footer {
   margin: 16px 0 0;
   font-size: 0.78rem;
-  color: #9ca3af;
+  color: #3f4441;
   text-align: center;
 }
 

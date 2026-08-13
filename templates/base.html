@@ -10,12 +10,19 @@
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600;700&family=Bebas+Neue&family=Montserrat:wght@400;500;600;700;800&display=swap" rel="stylesheet">
-    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=32">
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}?v=33">
 </head>
 <body class="{% block body_class %}{% endblock %}">
         {% if nav_member %}
     <div class="topbar">
-        <a href="{{ url_for('home') }}" class="brand">GSSBDC WING</a>
+        <a href="{{ url_for('home') }}" class="brand">
+            <img src="{{ url_for('static', filename='img/logo-icon.png') }}"
+            alt="GSSBDC"
+            class="brand-logo"
+            width="28"
+            height="28">
+            <span>GSSBDC WING</span>
+        </a>
 
         <nav class="topnav">
             {% if has_permission(nav_member, 'view_donors') %}

@@ -25,6 +25,8 @@ CREATE TABLE IF NOT EXISTS members (
     type TEXT,
     title TEXT DEFAULT '',
     portfolio TEXT DEFAULT '',
+    member_code TEXT DEFAULT '',
+    department TEXT DEFAULT '',
     active INTEGER DEFAULT 1,
     phone TEXT DEFAULT '',
     email TEXT DEFAULT '',
@@ -178,6 +180,13 @@ def _migrate_missing_columns(conn):
     if "contact" not in existing:
         conn.execute("ALTER TABLE requests ADD COLUMN contact TEXT")
 
+    # members: member_code + department (added later)
+    mem_cols = {row["name"] for row in conn.execute("PRAGMA table_info(members)")}
+    if "member_code" not in mem_cols:
+        conn.execute("ALTER TABLE members ADD COLUMN member_code TEXT DEFAULT ''")
+    if "department" not in mem_cols:
+        conn.execute("ALTER TABLE members ADD COLUMN department TEXT DEFAULT ''")
+
 
 # ---------------------------------------------------------------
 # Column definitions per table (order matters for INSERT)
@@ -185,19 +194,20 @@ def _migrate_missing_columns(conn):
 
 COLUMNS = {
     "members": ["id", "name", "username", "password", "type", "title", "portfolio",
+                "member_code", "department",
                 "active", "phone", "email", "deleted", "temp_permissions",
                 "requests_managed", "blood_managed", "donors_contacted", "successful_cases"],
     "donors": ["id", "donor_code", "department", "name", "blood_group", "phone",
-               "area", "latitude", "longitude", "active"],
+                "area", "latitude", "longitude", "active"],
     "requests": ["id", "blood_group", "area", "latitude", "longitude", "bags", "urgency",
-                 "status", "created_by", "created_date", "donation_date", "managed_by",
-                 "donor_id", "collected_bags", "completed_date", "patient_problem",
-                 "hemoglobin", "donation_place", "donation_time", "contact"],
+                "status", "created_by", "created_date", "donation_date", "managed_by",
+                "donor_id", "collected_bags", "completed_date", "patient_problem",
+                "hemoglobin", "donation_place", "donation_time", "contact"],
     "donations": ["id", "donor_id", "donor_name", "blood_group", "bags", "date",
-                  "request_id", "source", "managed_by", "managed_by_name",
-                  "member_id", "member_name", "status"],
+                "request_id", "source", "managed_by", "managed_by_name",
+                "member_id", "member_name", "status"],
     "contacts": ["id", "member_id", "member_name", "donor_id", "donor_name",
-                 "blood_group", "date", "status"],
+                "blood_group", "date", "status"],
     "notices": ["id", "title", "message", "priority", "date", "posted_by",
                 "posted_by_name", "active"],
     "committees": ["id", "start_date", "end_date"],
