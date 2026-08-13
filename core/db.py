@@ -272,70 +272,56 @@ def _row_to_dict(row, table):
     return d
 
 
-def db_load(table):
-    with get_conn() as conn:
-        rows = conn.execute(f"SELECT * FROM {table} ORDER BY id").fetchall()
-        records = [_row_to_dict(r, table) for r in rows]
-
-        if table == "requests":
-            fulfillments_by_req = {}
-            try:
-                for f in conn.execute("SELECT * FROM fulfillments ORDER BY fid").fetchall():
-                    fd = dict(f)
-                    req_id = fd.pop("request_id", None)
-                    fd.pop("fid", None)
-                    if req_id is None:
-                        continue
-                    if fd.get("id") is None:
-                        fd["id"] = fd.get("donation_id") or 0
-                    fulfillments_by_req.setdefault(req_id, []).append(fd)
-            except Exception:
-                fulfillments_by_req = {}
-            for r in records:
-                r["fulfillments"] = fulfillments_by_req.get(r["id"], [])
-
-        return records
-
-
 def db_save(table, data):
+    if table not in COLUMNS:
+        print(f"db_save: unknown table {table}")
+        return
+    if not isinstance(data, list):
+        print(f"db_save: data for {table} is not a list")
+        return
+
     cols = COLUMNS[table]
     bool_fields = set(BOOL_FIELDS.get(table, []))
 
-    with get_conn() as conn:
-        conn.execute(f"DELETE FROM {table}")
-        if table == "requests":
-            conn.execute("DELETE FROM fulfillments")
-
-        for record in data:
-            values = []
-            for c in cols:
-                v = record.get(c)
-                if c in bool_fields:
-                    v = 1 if v else 0
-                elif c == "temp_permissions":
-                    v = json.dumps(v or [])
-                values.append(v)
-            placeholders = ",".join("?" for _ in cols)
-            conn.execute(
-                f"INSERT INTO {table} ({','.join(cols)}) VALUES ({placeholders})",
-                values
-            )
-
+    try:
+        with get_conn() as conn:
+            conn.execute(f"DELETE FROM {table}")
             if table == "requests":
-                for f in record.get("fulfillments", []) or []:
-                    fvals = []
-                    for c in FULFILLMENT_COLUMNS:
-                        if c == "request_id":
-                            fvals.append(record["id"])
-                        else:
-                            fvals.append(f.get(c))
-                    try:
-                        conn.execute(
-                            f"INSERT INTO fulfillments ({','.join(FULFILLMENT_COLUMNS)}) VALUES ({','.join('?' for _ in FULFILLMENT_COLUMNS)})",
-                            fvals
-                        )
-                    except Exception as e:
-                        print("fulfillment insert error:", e)
+                conn.execute("DELETE FROM fulfillments")
+
+            for record in data:
+                values = []
+                for c in cols:
+                    v = record.get(c)
+                    if c in bool_fields:
+                        v = 1 if v else 0
+                    elif c == "temp_permissions":
+                        v = json.dumps(v or [])
+                    values.append(v)
+                placeholders = ",".join("?" for _ in cols)
+                conn.execute(
+                    f"INSERT INTO {table} ({','.join(cols)}) VALUES ({placeholders})",
+                    values
+                )
+
+                if table == "requests":
+                    for f in record.get("fulfillments", []) or []:
+                        fvals = []
+                        for c in FULFILLMENT_COLUMNS:
+                            if c == "request_id":
+                                fvals.append(record["id"])
+                            else:
+                                fvals.append(f.get(c))
+                        try:
+                            conn.execute(
+                                f"INSERT INTO fulfillments ({','.join(FULFILLMENT_COLUMNS)}) VALUES ({','.join('?' for _ in FULFILLMENT_COLUMNS)})",
+                                fvals
+                            )
+                        except Exception as e:
+                            print(f"fulfillment insert error: {e}")
+    except Exception as e:
+        print(f"db_save({table}) failed: {e}")
+        raise
 
 
 def db_load_simple_list(table):

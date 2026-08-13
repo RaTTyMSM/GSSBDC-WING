@@ -1,0 +1,16 @@
+{% extends "base.html" %}
+{% block title %}{{ code }} — GSSBDC WING{% endblock %}
+{% block content %}
+<div class="card" style="max-width:520px;margin:40px auto;text-align:center;">
+    <h2 style="font-size:3rem;margin:0;color:var(--err);">{{ code }}</h2>
+    <p style="font-size:1.1rem;margin:12px 0;">{{ message }}</p>
+    {% if detail %}
+    <p class="muted" style="font-size:0.85rem;">{{ detail }}</p>
+    {% endif %}
+    <p style="margin-top:24px;">
+        <a href="{{ url_for('home') }}" class="btn">Go to Dashboard</a>
+        &nbsp;
+        <a href="{{ url_for('login') }}">Login</a>
+    </p>
+</div>
+{% endblock %}

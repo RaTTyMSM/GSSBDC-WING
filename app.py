@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, session, redirect, url_for, abort, jsonify
+from flask import Flask, render_template, request, session, redirect, url_for, abort, jsonify, flash
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from core.helpers import (
     load_data, save_data, calculate_distance, geocode_location,
@@ -13,6 +13,15 @@ from core.permissions import has_permission, GRANTABLE_PERMISSIONS, can_add_role
 from core.security import hash_password, verify_password, is_hashed, generate_csrf_token, validate_csrf
 import os
 import secrets
+
+import traceback
+import logging
+
+logging.basicConfig(
+    level=logging.INFO,
+    format="%(asctime)s [%(levelname)s] %(message)s",
+)
+log = logging.getLogger("gssbdc")
 
 app = Flask(__name__)
 app.jinja_env.globals["has_permission"] = has_permission
@@ -84,28 +93,84 @@ def check_csrf():
         if not validate_csrf(session.get("_csrf_token"), token):
             abort(400, description="Invalid or missing CSRF token. Please refresh the page and try again.")
 
+# =====================================
+# Global error handlers
+# =====================================
+
+@app.errorhandler(400)
+def error_400(e):
+    msg = getattr(e, "description", None) or "Bad request."
+    return render_template("error.html", code=400, message="Bad Request", detail=msg), 400
+
+
+@app.errorhandler(403)
+def error_403(e):
+    msg = getattr(e, "description", None) or "You do not have permission to access this page."
+    return render_template("error.html", code=403, message="Access Denied", detail=msg), 403
+
+
+@app.errorhandler(404)
+def error_404(e):
+    return render_template("error.html", code=404, message="Page Not Found", detail="The page you requested does not exist."), 404
+
+
+@app.errorhandler(405)
+def error_405(e):
+    return render_template("error.html", code=405, message="Method Not Allowed", detail="This action is not allowed here."), 405
+
+
+@app.errorhandler(500)
+def error_500(e):
+    log.exception("Internal server error: %s", e)
+    return render_template(
+        "error.html",
+        code=500,
+        message="Something went wrong",
+        detail="An unexpected error occurred. Please try again or contact an admin.",
+    ), 500
+
+
+@app.errorhandler(Exception)
+def error_unhandled(e):
+    """Catch-all so the app doesn't dump a raw traceback to the browser."""
+    log.exception("Unhandled exception: %s", e)
+    # In debug mode, re-raise so Flask shows the debugger
+    if app.debug:
+        raise
+    return render_template(
+        "error.html",
+        code=500,
+        message="Something went wrong",
+        detail="An unexpected error occurred. Please try again.",
+    ), 500
 
 def get_current_member():
-    """Load fresh member from JSON using session member_id."""
-    member_id = session.get("member_id")
-    if member_id is None:
-        # backward compat during transition
-        old = session.get("member")
-        if isinstance(old, dict) and "id" in old:
-            member_id = old["id"]
-            session["member_id"] = member_id
-        else:
+    """Load fresh member from DB using session member_id."""
+    try:
+        member_id = session.get("member_id")
+        if member_id is None:
+            old = session.get("member")
+            if isinstance(old, dict) and "id" in old:
+                member_id = old["id"]
+                session["member_id"] = member_id
+            else:
+                return None
+        members = load_data(MEMBER_FILE)
+        if not isinstance(members, list):
+            log.error("members data is not a list")
             return None
-    members = load_data(MEMBER_FILE)
-    member = next(
-        (m for m in members if m.get("id") == member_id and not m.get("deleted", False)),
-        None,
-    )
-    if member is None or not member.get("active", True):
+        member = next(
+            (m for m in members if m.get("id") == member_id and not m.get("deleted", False)),
+            None,
+        )
+        if member is None or not member.get("active", True):
+            return None
+        safe = dict(member)
+        safe.pop("password", None)
+        return safe
+    except Exception as e:
+        log.exception("get_current_member failed: %s", e)
         return None
-    safe = dict(member)
-    safe.pop("password", None)
-    return safe
 
 
 def require_member():
@@ -222,7 +287,7 @@ def broadcast_dashboard_charts():
         data = _build_dashboard_chart_data()
         socketio.emit("charts_update", data, room="dashboard")
     except Exception as e:
-        print("broadcast_dashboard_charts error:", e)
+        log.exception("broadcast_dashboard_charts error: %s", e)
 
 
 def push_notification(kind, title, message, link=None, audience="all", extra=None):
@@ -344,7 +409,7 @@ def members_list():
         return redirect(url_for("login"))
 
     if not has_permission(member, "view_members"):
-        return "Access denied.", 403
+        abort(403, description="You do not have permission for this action.")
 
     members = load_data(MEMBER_FILE)
 
@@ -389,7 +454,7 @@ def add_member_page():
         return redirect(url_for("login"))
 
     if not has_permission(member, "manage_members"):
-        return "Access denied.", 403
+        abort(403, description="You do not have permission for this action.")
 
     current_role = member["type"]
     from core.permissions import ADDABLE_ROLES
@@ -484,7 +549,7 @@ def manage_access():
         return redirect(url_for("login"))
 
     if not has_permission(member, "manage_access"):
-        return "Access denied.", 403
+        abort(403, description="You do not have permission for this action.")
 
     members = load_data(MEMBER_FILE)
     general_members = [m for m in members if m.get("type") == "General"]
@@ -499,7 +564,7 @@ def manage_access_member(member_id):
         return redirect(url_for("login"))
 
     if not has_permission(member, "manage_access"):
-        return "Access denied.", 403
+        abort(403, description="You do not have permission for this action.")
 
     members = load_data(MEMBER_FILE)
     target = None
@@ -509,7 +574,7 @@ def manage_access_member(member_id):
             break
 
     if target is None:
-        return "Member not found.", 404
+        abort(404, description="Member not found.")
 
     if request.method == "POST":
         selected = request.form.getlist("permissions")
@@ -532,7 +597,7 @@ def donors_list():
         return redirect(url_for("login"))
 
     if not has_permission(member, "view_donors"):
-        return "Access denied.", 403
+        abort(403, description="You do not have permission for this action.")
 
     donors = load_data(DONOR_FILE)
 
@@ -573,7 +638,7 @@ def add_donor_page():
         return redirect(url_for("login"))
 
     if not has_permission(member, "add_donor"):
-        return "Access denied.", 403
+        abort(403, description="You do not have permission for this action.")
 
     if request.method == "POST":
         donors = load_data(DONOR_FILE)
@@ -645,7 +710,7 @@ def edit_donor_page(donor_id):
         return redirect(url_for("login"))
 
     if not has_permission(member, "edit_donor"):
-        return "Access denied.", 403
+        abort(403, description="You do not have permission for this action.")
 
     donors = load_data(DONOR_FILE)
     donor = next((d for d in donors if d["id"] == donor_id), None)
@@ -723,7 +788,7 @@ def delete_donor(donor_id):
         return redirect(url_for("login"))
 
     if not has_permission(member, "delete_donor"):
-        return "Access denied.", 403
+        abort(403, description="You do not have permission for this action.")
 
     donors = load_data(DONOR_FILE)
     donor = next((d for d in donors if d["id"] == donor_id), None)
@@ -744,7 +809,7 @@ def requests_list():
         return redirect(url_for("login"))
 
     if not has_permission(member, "view_requests"):
-        return "Access denied.", 403
+        abort(403, description="You do not have permission for this action.")
 
     requests_data = load_data(REQUEST_FILE)
 
@@ -777,7 +842,7 @@ def create_request_page():
         return redirect(url_for("login"))
 
     if not has_permission(member, "create_request"):
-        return "Access denied.", 403
+        abort(403, description="You do not have permission for this action.")
 
     if request.method == "POST":
         requests_data = load_data(REQUEST_FILE)
@@ -897,7 +962,7 @@ def match_donors_page(request_id):
         return redirect(url_for("login"))
 
     if not has_permission(member, "complete_request"):
-        return "Access denied.", 403
+        abort(403, description="You do not have permission for this action.")
 
     requests_data = load_data(REQUEST_FILE)
     req = next((r for r in requests_data if r["id"] == request_id), None)
@@ -943,7 +1008,7 @@ def complete_request_page(request_id):
         return redirect(url_for("login"))
 
     if not has_permission(member, "complete_request"):
-        return "Access denied.", 403
+        abort(403, description="You do not have permission for this action.")
 
     requests_data = load_data(REQUEST_FILE)
     req = next((r for r in requests_data if r["id"] == request_id), None)
@@ -968,7 +1033,7 @@ def complete_request_page(request_id):
 
         if action == "remove":
             if not has_permission(member, "complete_request"):
-                return "Access denied.", 403
+                abort(403, description="You do not have permission for this action.")
             try:
                 fulfillment_id = int(request.form.get("fulfillment_id"))
             except (ValueError, TypeError):
@@ -1160,7 +1225,7 @@ def manage_titles():
         return redirect(url_for("login"))
 
     if member["type"] not in ("Admin", "Watcher"):
-        return "Access denied.", 403
+        abort(403, description="You do not have permission for this action.")
 
     from core.permissions import add_executive_title
 
@@ -1181,12 +1246,12 @@ def edit_member_page(member_id):
         return redirect(url_for("login"))
 
     if not has_permission(member, "edit_data"):
-        return "Access denied.", 403
+        abort(403, description="You do not have permission for this action.")
 
     members = load_data(MEMBER_FILE)
     target = next((m for m in members if m["id"] == member_id and m.get("type") in ("Executive", "General") and not m.get("deleted", False)), None)
     if target is None:
-        return "Member not found.", 404
+        abort(404, description="Member not found.")
 
     current_role = member["type"]
     assignable_roles = ASSIGNABLE_ROLES.get(current_role, [])
@@ -1250,11 +1315,11 @@ def reset_credentials_page(member_id):
     members = load_data(MEMBER_FILE)
     target = next((m for m in members if m["id"] == member_id and not m.get("deleted", False)), None)
     if target is None:
-        return "Member not found.", 404
+        abort(404, description="Member not found.")
 
     current_role = member["type"]
     if not _can_reset_credentials(current_role, target["type"]):
-        return "Access denied.", 403
+        abort(403, description="You do not have permission for this action.")
 
     if request.method == "POST":
         username = request.form.get("username", "").strip()
@@ -1316,12 +1381,12 @@ def delete_member(member_id):
         return redirect(url_for("login"))
 
     if not has_permission(member, "delete_data"):
-        return "Access denied.", 403
+        abort(403, description="You do not have permission for this action.")
 
     members = load_data(MEMBER_FILE)
     target = next((m for m in members if m["id"] == member_id), None)
     if target is None:
-        return "Member not found.", 404
+        abort(404, description="Member not found.")
 
     target["deleted"] = True
     target["active"] = False
@@ -1339,7 +1404,7 @@ def donations_list():
         return redirect(url_for("login"))
 
     if not has_permission(member, "view_donors"):
-        return "Access denied.", 403
+        abort(403, description="You do not have permission for this action.")
 
     donations = load_data(DONATION_FILE)
     donations.sort(key=lambda d: d.get("date", ""), reverse=True)
@@ -1360,7 +1425,7 @@ def add_donation_page():
         return redirect(url_for("login"))
 
     if not has_permission(member, "add_donation"):
-        return "Access denied.", 403
+        abort(403, description="You do not have permission for this action.")
 
     donors = load_data(DONOR_FILE)
     active_donors = [d for d in donors if d.get("active", True)]
@@ -1414,7 +1479,7 @@ def notices_list():
         return redirect(url_for("login"))
 
     if not has_permission(member, "view_notices"):
-        return "Access denied.", 403
+        abort(403, description="You do not have permission for this action.")
 
     notices = load_data(NOTICE_FILE)
     can_manage = has_permission(member, "manage_notices")
@@ -1443,7 +1508,7 @@ def add_notice_page():
         return redirect(url_for("login"))
 
     if not has_permission(member, "manage_notices"):
-        return "Access denied.", 403
+        abort(403, description="You do not have permission for this action.")
 
     if request.method == "POST":
         title = request.form.get("title", "").strip()
@@ -1496,7 +1561,7 @@ def edit_notice_page(notice_id):
         return redirect(url_for("login"))
 
     if not has_permission(member, "manage_notices"):
-        return "Access denied.", 403
+        abort(403, description="You do not have permission for this action.")
 
     notices = load_data(NOTICE_FILE)
     notice = next((n for n in notices if n["id"] == notice_id), None)
@@ -1537,7 +1602,7 @@ def toggle_notice(notice_id):
         return redirect(url_for("login"))
 
     if not has_permission(member, "manage_notices"):
-        return "Access denied.", 403
+        abort(403, description="You do not have permission for this action.")
 
     notices = load_data(NOTICE_FILE)
     notice = next((n for n in notices if n["id"] == notice_id), None)
@@ -1555,7 +1620,7 @@ def delete_notice(notice_id):
         return redirect(url_for("login"))
 
     if not has_permission(member, "manage_notices"):
-        return "Access denied.", 403
+        abort(403, description="You do not have permission for this action.")
 
     notices = load_data(NOTICE_FILE)
     notice = next((n for n in notices if n["id"] == notice_id), None)
@@ -1577,7 +1642,7 @@ def contact_donor_page(donor_id):
         return redirect(url_for("login"))
 
     if not has_permission(member, "contact_donor"):
-        return "Access denied.", 403
+        abort(403, description="You do not have permission for this action.")
 
     donors = load_data(DONOR_FILE)
     donor = next((d for d in donors if d["id"] == donor_id), None)
@@ -1625,7 +1690,7 @@ def contacts_list():
         return redirect(url_for("login"))
 
     if not has_permission(member, "view_contacts"):
-        return "Access denied.", 403
+        abort(403, description="You do not have permission for this action.")
 
     contacts = load_data(CONTACT_FILE)
 
@@ -1929,7 +1994,7 @@ def statistics_page():
         return redirect(url_for("login"))
 
     if not has_permission(member, "view_statistics"):
-        return "Access denied.", 403
+        abort(403, description="You do not have permission for this action.")
 
     donors = load_data(DONOR_FILE)
     donations = load_data(DONATION_FILE)
@@ -2004,7 +2069,7 @@ def statistics_yearly_page():
         return redirect(url_for("login"))
 
     if not has_permission(member, "view_statistics"):
-        return "Access denied.", 403
+        abort(403, description="You do not have permission for this action.")
 
     donations = load_data(DONATION_FILE)
     requests_data = load_data(REQUEST_FILE)
@@ -2053,7 +2118,7 @@ def statistics_committee_page():
         return redirect(url_for("login"))
 
     if not has_permission(member, "view_statistics"):
-        return "Access denied.", 403
+        abort(403, description="You do not have permission for this action.")
 
     donations = load_data(DONATION_FILE)
     requests_data = load_data(REQUEST_FILE)
@@ -2124,7 +2189,7 @@ def manage_committees():
     if member is None:
         return redirect(url_for("login"))
     if member["type"] not in ("Admin", "Watcher"):
-        return "Access denied.", 403
+        abort(403, description="You do not have permission for this action.")
 
     committees = load_data(COMMITTEE_FILE)
     error = None
