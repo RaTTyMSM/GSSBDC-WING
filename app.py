@@ -14,14 +14,10 @@ from core.security import hash_password, verify_password, is_hashed, generate_cs
 import os
 import secrets
 
-import traceback
-import logging
+from core.logging_config import setup_logging, get_logger
 
-logging.basicConfig(
-    level=logging.INFO,
-    format="%(asctime)s [%(levelname)s] %(message)s",
-)
-log = logging.getLogger("gssbdc")
+setup_logging()
+log = get_logger(__name__)
 
 app = Flask(__name__)
 app.jinja_env.globals["has_permission"] = has_permission
@@ -275,10 +271,13 @@ def api_dashboard_charts():
 def _socket_member():
     """Resolve logged-in member from the Flask session (shared with Socket.IO)."""
     member_id = session.get("member_id")
-    if not member_id:
+    if member_id is None:  # id=0 (Watcher) বৈধ — শুধু None চেক করো
         return None
     members = load_data(MEMBER_FILE)
-    return next((m for m in members if m.get("id") == member_id and not m.get("deleted")), None)
+    return next(
+        (m for m in members if m.get("id") == member_id and not m.get("deleted")),
+        None,
+    )
 
 
 def broadcast_dashboard_charts():
@@ -287,15 +286,15 @@ def broadcast_dashboard_charts():
         data = _build_dashboard_chart_data()
         socketio.emit("charts_update", data, room="dashboard")
     except Exception as e:
-        log.exception("broadcast_dashboard_charts error: %s", e)
+        log.exception("broadcast_dashboard_charts_failed", error=str(e))
 
 
 def push_notification(kind, title, message, link=None, audience="all", extra=None):
     """Broadcast a real-time notification over Socket.IO.
 
     audience:
-      - "all"         -> every logged-in client in room notif_all
-      - "executives"  -> Executive / Admin / Watcher only (room notif_exec)
+    - "all"         -> every logged-in client in room notif_all
+    - "executives"  -> Executive / Admin / Watcher only (room notif_exec)
     """
     payload = {
         "id": f"{kind}-{datetime.utcnow().strftime('%Y%m%d%H%M%S%f')}",
@@ -311,17 +310,16 @@ def push_notification(kind, title, message, link=None, audience="all", extra=Non
     try:
         room = "notif_exec" if audience == "executives" else "notif_all"
         socketio.emit("notification", payload, room=room)
-        # executives also sit in notif_all; avoid double-send for "all"
-        print(f"[notif] {kind} -> {room}: {title}")
+        log.info("notification_sent", kind=kind, room=room, title=title)
     except Exception as e:
-        print("push_notification error:", e)
+        log.exception("notification_failed", error=str(e))
 
 
 @socketio.on("connect")
 def ws_connect():
     member = _socket_member()
     if member is None:
-        print("[ws] connect rejected: no session")
+        log.warning("ws_connect_rejected", reason="no_session")
         return False
 
     # Everyone logged in receives general notifications
@@ -334,20 +332,23 @@ def ws_connect():
     # Dashboard chart stream (optional permission)
     if has_permission(member, "view_statistics"):
         join_room("dashboard")
-        emit("charts_update", _build_dashboard_chart_data())
+        try:
+            emit("charts_update", _build_dashboard_chart_data())
+        except Exception as e:
+            log.exception("ws_charts_emit_failed", error=str(e))
 
-    print(
-        "[ws] connected:", member.get("name"),
-        "type=", member.get("type"),
-        "rooms=notif_all"
-        + ("+notif_exec" if member.get("type") in ("Executive", "Admin", "Watcher") else "")
-        + ("+dashboard" if has_permission(member, "view_statistics") else "")
+    log.info(
+        "ws_connected",
+        user_id=member.get("id"),
+        name=member.get("name"),
+        role=member.get("type"),
     )
 
 
 @socketio.on("disconnect")
 def ws_disconnect():
     leave_room("dashboard")
+    log.info("ws_disconnected")
 
 
 @socketio.on("request_charts")
@@ -355,7 +356,10 @@ def ws_request_charts():
     member = _socket_member()
     if member is None or not has_permission(member, "view_statistics"):
         return
-    emit("charts_update", _build_dashboard_chart_data())
+    try:
+        emit("charts_update", _build_dashboard_chart_data())
+    except Exception as e:
+        log.exception("ws_request_charts_failed", error=str(e))
 
 
 def _start_dashboard_push_loop():
@@ -365,7 +369,7 @@ def _start_dashboard_push_loop():
         try:
             broadcast_dashboard_charts()
         except Exception as e:
-            print("dashboard push loop error:", e)
+            log.exception("dashboard_push_loop_failed", error=str(e))
 
 
 @app.route("/login", methods=["GET", "POST"])
@@ -388,6 +392,7 @@ def login():
                     save_data(MEMBER_FILE, members)
                 session.clear()
                 session["member_id"] = member["id"]
+                log.info("login_success", user_id=member["id"], username=username, role=member.get("type"))
                 session["_csrf_token"] = generate_csrf_token()
 
                 # Remember me → cookie 30 days. 
@@ -397,8 +402,9 @@ def login():
                     session.permanent = False
 
                 return redirect(url_for("home"))
-
+                log.warning("login_failed", username=username)
         return render_template("login.html", error="Invalid username or password.")
+
 
     return render_template("login.html")
 
@@ -461,7 +467,7 @@ def add_member_page():
     addable_roles = ADDABLE_ROLES.get(current_role, [])
 
     if not addable_roles:
-        return "You are not allowed to add members.", 403
+        abort(403, description="You are not allowed to add members.")
 
     if request.method == "POST":
         members = load_data(MEMBER_FILE)
@@ -533,7 +539,7 @@ def add_member_page():
             kind="member",
             title="New member added",
             message=f"{name} joined as {role}"
-                     + (f" ({title})" if title else ""),
+                    + (f" ({title})" if title else ""),
             link=url_for("members_list"),
             audience="all",
             extra={"member_id": new_id, "role": role},
@@ -715,7 +721,7 @@ def edit_donor_page(donor_id):
     donors = load_data(DONOR_FILE)
     donor = next((d for d in donors if d["id"] == donor_id), None)
     if donor is None:
-        return "Donor not found.", 404
+        abort(404, description="Donor not found.")
 
     if request.method == "POST":
         name = request.form.get("name", "").strip()
@@ -793,7 +799,7 @@ def delete_donor(donor_id):
     donors = load_data(DONOR_FILE)
     donor = next((d for d in donors if d["id"] == donor_id), None)
     if donor is None:
-        return "Donor not found.", 404
+        abort(404, description="Donor not found.")
 
     # Soft delete: mark inactive instead of erasing the record. A hard
     # delete here would orphan the donor_id still referenced by past
@@ -967,7 +973,7 @@ def match_donors_page(request_id):
     requests_data = load_data(REQUEST_FILE)
     req = next((r for r in requests_data if r["id"] == request_id), None)
     if req is None:
-        return "Request not found.", 404
+        abort(404, description="Request not found.")
 
     donors = load_data(DONOR_FILE)
     donations = load_data(DONATION_FILE)
@@ -1013,15 +1019,15 @@ def complete_request_page(request_id):
     requests_data = load_data(REQUEST_FILE)
     req = next((r for r in requests_data if r["id"] == request_id), None)
     if req is None:
-        return "Request not found.", 404
+        abort(404, description="Request not found.")
 
     req.setdefault("fulfillments", [])
     sync_request_status(req)
 
     if req["status"] in ("Partial", "Incomplete"):
-        return "This request has passed its 3-day window and is locked. It can no longer be edited.", 403
+        abort(403, description="This request has passed its 3-day window and is locked. It can no longer be edited.")
     if req["status"] == "Fulfilled":
-        return "This request is already fully completed.", 400
+        abort(400, description="This request is already fully completed.")
 
     error = None
 
@@ -1069,7 +1075,7 @@ def complete_request_page(request_id):
         elif action == "add":
             remaining = request_bags_remaining(req)
             if remaining <= 0:
-                error = "Requested bags are already fully managed for this request."
+                abort(400, description="Requested bags are already fully managed for this request.")
             else:
                 source = request.form.get("source", "club")
                 today_str = date.today().isoformat()
@@ -1081,7 +1087,7 @@ def complete_request_page(request_id):
                         donor_id = int(request.form.get("donor_id"))
                     except (ValueError, TypeError):
                         donor_id = None
-                        error = "Please select a donor."
+                        abort(400, description="Please select a donor.")
 
                     if donor_id is not None:
                         donor = next((d for d in donors if d["id"] == donor_id), None)
@@ -1090,17 +1096,17 @@ def complete_request_page(request_id):
                             for f in req["fulfillments"]
                         )
                         if donor is None:
-                            error = "Donor not found."
+                            abort(404, description="Donor not found.")
                         elif already_used:
-                            error = "This donor has already been recorded for this request."
+                            abort(400, description="This donor has already been recorded for this request.")
                         elif donor.get("blood_group") != req["blood_group"]:
-                            error = "Donor blood group does not match the requested blood group."
+                            abort(400, description="Donor blood group does not match the requested blood group.")
                         elif not donor.get("active", True):
-                            error = "This donor is inactive."
+                            abort(400, description="This donor is inactive.")
                         else:
                             eligibility = get_eligibility(donor_id, donations)
                             if not eligibility["eligible"]:
-                                error = f"Donor not eligible until {eligibility['next_date']}."
+                                abort(400, description=f"Donor not eligible until {eligibility['next_date']}.")
                             else:
                                 manager = member
                                 donation_rec = create_automatic_donation(
@@ -1326,11 +1332,11 @@ def reset_credentials_page(member_id):
         password = request.form.get("password", "").strip()
 
         if not username or len(password) < 4:
-            return render_template("reset_credentials.html", member=target, error="Username required, password min 4 chars.")
+            abort(400, description="Username required, password min 4 chars.")
 
         for m in members:
             if m["id"] != member_id and m.get("username", "").lower() == username.lower():
-                return render_template("reset_credentials.html", member=target, error="Username already taken.")
+                abort(400, description="Username already taken.")
 
         target["username"] = username
         target["password"] = hash_password(password)
@@ -1348,7 +1354,7 @@ def change_own_password():
 
     # Admins can't change their own password -- only the Watcher can reset it for them
     if member["type"] == "Admin":
-        return "Admins cannot change their own password. Contact the Watcher.", 403
+        abort(403, description="Admins cannot change their own password. Contact the Watcher.")
 
     if request.method == "POST":
         current_password = request.form.get("current_password", "")
@@ -1357,13 +1363,13 @@ def change_own_password():
         members = load_data(MEMBER_FILE)
         me = next((m for m in members if m["id"] == member["id"]), None)
         if me is None:
-            return "Account not found.", 404
+            abort(404, description="Account not found.")
 
         if not verify_password(current_password, me.get("password", "")):
-            return render_template("change_password.html", error="Current password is incorrect.")
+            abort(400, description="Current password is incorrect.")
 
         if len(new_password) < 4:
-            return render_template("change_password.html", error="New password must be at least 4 characters.")
+            abort(400, description="New password must be at least 4 characters.")
 
         me["password"] = hash_password(new_password)
         save_data(MEMBER_FILE, members)
@@ -1647,7 +1653,7 @@ def contact_donor_page(donor_id):
     donors = load_data(DONOR_FILE)
     donor = next((d for d in donors if d["id"] == donor_id), None)
     if donor is None:
-        return "Donor not found.", 404
+        abort(404, description="Donor not found.")
 
     if request.method == "POST":
         status = request.form.get("status", "").strip()

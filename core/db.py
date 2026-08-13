@@ -13,6 +13,9 @@ import json
 import os
 from contextlib import contextmanager
 
+from core.logging_config import get_logger
+log = get_logger(__name__)
+
 BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DB_PATH = os.path.join(BASE_DIR, "data", "gssbdc.db")
 
@@ -271,13 +274,41 @@ def _row_to_dict(row, table):
             d["temp_permissions"] = []
     return d
 
+def db_load(table):
+    try:
+        with get_conn() as conn:
+            rows = conn.execute(f"SELECT * FROM {table} ORDER BY id").fetchall()
+            records = [_row_to_dict(r, table) for r in rows]
+
+            if table == "requests":
+                fulfillments_by_req = {}
+                try:
+                    for f in conn.execute("SELECT * FROM fulfillments ORDER BY fid").fetchall():
+                        fd = dict(f)
+                        req_id = fd.pop("request_id", None)
+                        fd.pop("fid", None)
+                        if req_id is None:
+                            continue
+                        if fd.get("id") is None:
+                            fd["id"] = fd.get("donation_id") or 0
+                        fulfillments_by_req.setdefault(req_id, []).append(fd)
+                except Exception as e:
+                    log.warning("fulfillments_load_failed", error=str(e))
+                    fulfillments_by_req = {}
+                for r in records:
+                    r["fulfillments"] = fulfillments_by_req.get(r["id"], [])
+
+            return records
+    except Exception as e:
+        log.exception("db_load_failed", table=table, error=str(e))
+        return []
 
 def db_save(table, data):
     if table not in COLUMNS:
-        print(f"db_save: unknown table {table}")
+        log.warning("db_save_unknown_table", table=table)
         return
     if not isinstance(data, list):
-        print(f"db_save: data for {table} is not a list")
+        log.warning("db_save_invalid_data", table=table)
         return
 
     cols = COLUMNS[table]
@@ -318,9 +349,9 @@ def db_save(table, data):
                                 fvals
                             )
                         except Exception as e:
-                            print(f"fulfillment insert error: {e}")
+                            log.warning("fulfillment_insert_failed", error=str(e))
     except Exception as e:
-        print(f"db_save({table}) failed: {e}")
+        log.exception("db_save_failed", table=table, error=str(e))
         raise
 
 
