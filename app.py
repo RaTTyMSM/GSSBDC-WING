@@ -1,4 +1,4 @@
-from flask import Flask, render_template, request, session, redirect, url_for, abort, jsonify, flash
+from flask import Flask, render_template, request, session, redirect, url_for, abort, jsonify, flash, send_from_directory
 from flask_socketio import SocketIO, emit, join_room, leave_room
 from core.helpers import (
     load_data, save_data, calculate_distance, geocode_location,
@@ -2245,6 +2245,16 @@ def manage_committees():
     committees_display.reverse()
 
     return render_template("manage_committees.html", committees=committees_display, today=date.today().isoformat(), error=error)
+
+@app.route("/service-worker.js")
+def service_worker():
+    # Served from the root path (not /static/) so its default scope covers
+    # the whole site, not just /static/. No login_required -- the browser
+    # fetches this before any page/session context exists.
+    response = send_from_directory("static", "service-worker.js", mimetype="application/javascript")
+    response.headers["Service-Worker-Allowed"] = "/"
+    response.headers["Cache-Control"] = "no-cache"
+    return response
 
 @app.route("/logout")
 def logout():
