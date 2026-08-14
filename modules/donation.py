@@ -5,6 +5,9 @@ from datetime import timedelta
 from core.helpers import *
 from core.permissions import *
 
+# Standard minimum gap between whole-blood donations (WHO/BDS guideline: 90 days / ~3 months)
+DONATION_WAITING_DAYS = 90
+
 def pause():
     input("\nPress Enter to continue...")
 

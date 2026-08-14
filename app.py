@@ -1013,10 +1013,10 @@ def _grant_member_credit(members, req, member_id, bags_just_added):
     ]
 
     if not prior:
-        member["requests_managed"] = member.get("requests_managed", 0) + 1
-        member["successful_cases"] = member.get("successful_cases", 0) + 1
+        member["requests_managed"] = (member.get("requests_managed") or 0) + 1
+        member["successful_cases"] = (member.get("successful_cases") or 0) + 1
 
-    member["blood_managed"] = member.get("blood_managed", 0) + bags_just_added
+    member["blood_managed"] = (member.get("blood_managed") or 0) + bags_just_added
 
 
 @app.route("/requests/<int:request_id>/complete", methods=["GET", "POST"])
@@ -1070,14 +1070,14 @@ def complete_request_page(request_id):
                 if removed.get("source") == "club" and removed.get("managed_by"):
                     member = next((m for m in members if m.get("id") == removed["managed_by"]), None)
                     if member is not None:
-                        member["blood_managed"] = max(0, member.get("blood_managed", 0) - removed.get("bags", 0))
+                        member["blood_managed"] = max(0, (member.get("blood_managed") or 0) - removed.get("bags", 0))
                         still_has = any(
                             f.get("source") == "club" and f.get("managed_by") == removed["managed_by"]
                             for f in req["fulfillments"]
                         )
                         if not still_has:
-                            member["requests_managed"] = max(0, member.get("requests_managed", 0) - 1)
-                            member["successful_cases"] = max(0, member.get("successful_cases", 0) - 1)
+                            member["requests_managed"] = max(0, (member.get("requests_managed") or 0) - 1)
+                            member["successful_cases"] = max(0, (member.get("successful_cases") or 0) - 1)
                         save_data(MEMBER_FILE, members)
 
             sync_request_status(req)
@@ -1694,7 +1694,7 @@ def contact_donor_page(donor_id):
         save_data(CONTACT_FILE, contacts)
 
         if db_member is not None:
-            db_member["donors_contacted"] = db_member.get("donors_contacted", 0) + 1
+            db_member["donors_contacted"] = (db_member.get("donors_contacted") or 0) + 1
             save_data(MEMBER_FILE, members)
 
         return redirect(url_for("donor_contacts_list", donor_id=donor_id))

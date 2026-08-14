@@ -316,9 +316,18 @@ def db_save(table, data):
 
     try:
         with get_conn() as conn:
-            conn.execute(f"DELETE FROM {table}")
+            # This function does a full delete+reinsert of the table on every
+            # save. Several tables (donors, members, requests) are referenced
+            # by other tables' foreign keys without ON DELETE CASCADE, so the
+            # DELETE step alone would violate those constraints even though
+            # every row gets reinserted with the same id a few lines later.
+            # Relaxing enforcement for the duration of this single save
+            # (delete + full reinsert) is safe: referential integrity is
+            # restored before the transaction commits.
+            conn.execute("PRAGMA foreign_keys = OFF")
             if table == "requests":
                 conn.execute("DELETE FROM fulfillments")
+            conn.execute(f"DELETE FROM {table}")
 
             for record in data:
                 values = []
@@ -350,6 +359,17 @@ def db_save(table, data):
                             )
                         except Exception as e:
                             log.warning("fulfillment_insert_failed", error=str(e))
+
+            conn.execute("PRAGMA foreign_keys = ON")
+            # Catch any integrity problem that ON/OFF-relaxed inserts could
+            # have papered over (e.g. a genuinely dangling reference to a
+            # row that no longer exists anywhere) before it commits silently.
+            bad = conn.execute("PRAGMA foreign_key_check").fetchall()
+            if bad:
+                raise sqlite3.IntegrityError(f"foreign_key_check failed: {bad}")
+
+            if table == "requests":
+                conn.execute("PRAGMA foreign_keys = ON")
     except Exception as e:
         log.exception("db_save_failed", table=table, error=str(e))
         raise
